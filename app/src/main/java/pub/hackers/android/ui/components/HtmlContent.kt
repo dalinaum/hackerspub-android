@@ -11,10 +11,13 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
 import java.net.URI
 
 private enum class LinkType {
@@ -102,6 +105,14 @@ private fun parseHtmlToAnnotatedString(
         var insideInvisibleSpan = false
         var invisibleSpanDepth = 0
         var hasContent = false
+        var isBold = false
+        var isItalic = false
+        var isCode = false
+        var isPreformatted = false
+        var listDepth = 0
+        var orderedListCounter = 0
+        var isInList = false
+        var isBlockquote = false
 
         var pos = 0
         val source = html.trim()
@@ -118,7 +129,21 @@ private fun parseHtmlToAnnotatedString(
                 if (!insideInvisibleSpan && decoded.isNotEmpty()) {
                     val isInterBlockWhitespace = decoded.isBlank() && decoded.contains('\n')
                     if (!isInterBlockWhitespace) {
-                        appendStyledText(this, decoded, currentLinkType, linkColor, mentionBg)
+                        val styledText = decoded
+                        val inlineStyle = SpanStyle(
+                            fontWeight = if (isBold) FontWeight.Bold else null,
+                            fontStyle = if (isItalic) FontStyle.Italic else null,
+                            fontFamily = if (isCode || isPreformatted) FontFamily.Monospace else null,
+                            background = if (isCode && !isPreformatted) Color(0x20808080) else Color.Unspecified
+                        )
+
+                        if (isBold || isItalic || isCode || isPreformatted) {
+                            withStyle(inlineStyle) {
+                                appendStyledText(this, styledText, currentLinkType, linkColor, mentionBg)
+                            }
+                        } else {
+                            appendStyledText(this, styledText, currentLinkType, linkColor, mentionBg)
+                        }
                         hasContent = true
                     }
                 }
@@ -140,6 +165,47 @@ private fun parseHtmlToAnnotatedString(
                         }
                         "br" -> {
                             append("\n")
+                        }
+                        "strong", "b" -> {
+                            isBold = true
+                        }
+                        "em", "i" -> {
+                            isItalic = true
+                        }
+                        "code" -> {
+                            isCode = true
+                        }
+                        "pre" -> {
+                            if (hasContent) append("\n\n")
+                            isPreformatted = true
+                        }
+                        "blockquote" -> {
+                            if (hasContent) append("\n\n")
+                            isBlockquote = true
+                            append("  \u2502 ")
+                        }
+                        "ul" -> {
+                            if (hasContent && listDepth == 0) append("\n")
+                            listDepth++
+                            isInList = true
+                        }
+                        "ol" -> {
+                            if (hasContent && listDepth == 0) append("\n")
+                            listDepth++
+                            orderedListCounter = 0
+                            isInList = true
+                        }
+                        "li" -> {
+                            if (hasContent) append("\n")
+                            val indent = "  ".repeat(listDepth)
+                            if (orderedListCounter > 0 || tagName == "li") {
+                                // Check parent — simple heuristic: if orderedListCounter was reset, it's unordered
+                            }
+                            append("${indent}\u2022 ")
+                        }
+                        "h1", "h2", "h3", "h4", "h5", "h6" -> {
+                            if (hasContent) append("\n\n")
+                            isBold = true
                         }
                         "a" -> {
                             val classes = attrs["class"] ?: ""
@@ -168,6 +234,33 @@ private fun parseHtmlToAnnotatedString(
                     }
                 } else {
                     when (tagName) {
+                        "strong", "b" -> {
+                            isBold = false
+                        }
+                        "em", "i" -> {
+                            isItalic = false
+                        }
+                        "code" -> {
+                            isCode = false
+                        }
+                        "pre" -> {
+                            isPreformatted = false
+                            append("\n")
+                        }
+                        "blockquote" -> {
+                            isBlockquote = false
+                        }
+                        "ul", "ol" -> {
+                            listDepth = maxOf(0, listDepth - 1)
+                            if (listDepth == 0) {
+                                isInList = false
+                                orderedListCounter = 0
+                            }
+                        }
+                        "h1", "h2", "h3", "h4", "h5", "h6" -> {
+                            isBold = false
+                            append("\n")
+                        }
                         "a" -> {
                             if (hasAnnotation) {
                                 pop()
