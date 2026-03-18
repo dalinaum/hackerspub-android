@@ -25,6 +25,9 @@ data class ComposeUiState(
     val replyToId: String? = null,
     val replyTargetPost: Post? = null,
     val isLoadingReplyTarget: Boolean = false,
+    val quotedPostId: String? = null,
+    val quotedPost: Post? = null,
+    val isLoadingQuotedPost: Boolean = false,
     val isPosting: Boolean = false,
     val isPosted: Boolean = false,
     val error: String? = null,
@@ -175,6 +178,24 @@ class ComposeViewModel @Inject constructor(
         clearMentionState()
     }
 
+    fun setQuotedPost(postId: String) {
+        _uiState.update { it.copy(quotedPostId = postId, isLoadingQuotedPost = true) }
+        viewModelScope.launch {
+            repository.getPostDetail(postId)
+                .onSuccess { result ->
+                    _uiState.update {
+                        it.copy(
+                            quotedPost = result.post,
+                            isLoadingQuotedPost = false
+                        )
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isLoadingQuotedPost = false) }
+                }
+        }
+    }
+
     fun setReplyTarget(postId: String) {
         _uiState.update { it.copy(replyToId = postId, isLoadingReplyTarget = true) }
         viewModelScope.launch {
@@ -236,7 +257,8 @@ class ComposeViewModel @Inject constructor(
             repository.createNote(
                 content = state.content,
                 visibility = state.visibility,
-                replyTargetId = state.replyToId
+                replyTargetId = state.replyToId,
+                quotedPostId = state.quotedPostId
             )
                 .onSuccess {
                     _uiState.update { it.copy(isPosting = false, isPosted = true) }

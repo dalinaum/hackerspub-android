@@ -91,9 +91,13 @@ sealed class Screen(
 
 sealed class DetailScreen(val route: String) {
     data object SignIn : DetailScreen("signin")
-    data object Compose : DetailScreen("compose?replyTo={replyTo}") {
-        fun createRoute(replyTo: String? = null) =
-            if (replyTo != null) "compose?replyTo=$replyTo" else "compose"
+    data object Compose : DetailScreen("compose?replyTo={replyTo}&quoteOf={quoteOf}") {
+        fun createRoute(replyTo: String? = null, quoteOf: String? = null): String {
+            val params = mutableListOf<String>()
+            if (replyTo != null) params.add("replyTo=$replyTo")
+            if (quoteOf != null) params.add("quoteOf=$quoteOf")
+            return if (params.isEmpty()) "compose" else "compose?${params.joinToString("&")}"
+        }
     }
     data object PostDetail : DetailScreen("post/{postId}") {
         fun createRoute(postId: String) = "post/$postId"
@@ -248,12 +252,19 @@ fun HackersPubApp(
                         type = NavType.StringType
                         nullable = true
                         defaultValue = null
+                    },
+                    navArgument("quoteOf") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
                     }
                 )
             ) { backStackEntry ->
                 val replyTo = backStackEntry.arguments?.getString("replyTo")
+                val quoteOf = backStackEntry.arguments?.getString("quoteOf")
                 ComposeScreen(
                     replyToId = replyTo,
+                    quotedPostId = quoteOf,
                     onPostSuccess = {
                         navController.popBackStack()
                     },
@@ -277,7 +288,10 @@ fun HackersPubApp(
                         navController.navigate(DetailScreen.Profile.createRoute(handle))
                     },
                     onReplyClick = { id ->
-                        navController.navigate(DetailScreen.Compose.createRoute(id))
+                        navController.navigate(DetailScreen.Compose.createRoute(replyTo = id))
+                    },
+                    onQuoteClick = { id ->
+                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = id))
                     },
                     onPostClick = { id ->
                         navController.navigate(DetailScreen.PostDetail.createRoute(id))

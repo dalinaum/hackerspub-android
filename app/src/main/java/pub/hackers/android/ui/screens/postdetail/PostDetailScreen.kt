@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.outlined.AddReaction
+import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
@@ -78,6 +79,7 @@ fun PostDetailScreen(
     onNavigateBack: () -> Unit,
     onProfileClick: (String) -> Unit,
     onReplyClick: (String) -> Unit,
+    onQuoteClick: (String) -> Unit = {},
     onPostClick: (String) -> Unit,
     viewModel: PostDetailViewModel = hiltViewModel()
 ) {
@@ -211,7 +213,8 @@ fun PostDetailScreen(
                             }
                         },
                         onReactionClick = { emoji -> viewModel.toggleReaction(emoji) },
-                        onReactionPickerClick = { viewModel.toggleReactionPicker() }
+                        onReactionPickerClick = { viewModel.toggleReactionPicker() },
+                        onQuoteClick = { onQuoteClick(postId) }
                     )
                 }
             }
@@ -271,7 +274,8 @@ private fun PostDetailContent(
     onPostClick: (String) -> Unit,
     onShareClick: () -> Unit,
     onReactionClick: (String) -> Unit,
-    onReactionPickerClick: () -> Unit
+    onReactionPickerClick: () -> Unit,
+    onQuoteClick: () -> Unit
 ) {
     val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a")
         .withZone(ZoneId.systemDefault())
@@ -450,6 +454,13 @@ private fun PostDetailContent(
                                 MaterialTheme.colorScheme.primary
                             else
                                 MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onQuoteClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.FormatQuote,
+                            contentDescription = stringResource(R.string.quotes),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

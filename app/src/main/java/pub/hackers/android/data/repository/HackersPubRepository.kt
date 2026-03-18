@@ -353,7 +353,8 @@ class HackersPubRepository @Inject constructor(
         content: String,
         language: String = "en",
         visibility: PostVisibility = PostVisibility.PUBLIC,
-        replyTargetId: String? = null
+        replyTargetId: String? = null,
+        quotedPostId: String? = null
     ): Result<Post> {
         return try {
             val gqlVisibility = when (visibility) {
@@ -369,7 +370,8 @@ class HackersPubRepository @Inject constructor(
                     content = content,
                     language = language,
                     visibility = gqlVisibility,
-                    replyTargetId = Optional.presentIfNotNull(replyTargetId)
+                    replyTargetId = Optional.presentIfNotNull(replyTargetId),
+                    quotedPostId = Optional.presentIfNotNull(quotedPostId)
                 )
             ).execute()
 

@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Button
@@ -76,6 +77,7 @@ import kotlin.math.roundToInt
 @Composable
 fun ComposeScreen(
     replyToId: String?,
+    quotedPostId: String? = null,
     onPostSuccess: () -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: ComposeViewModel = hiltViewModel()
@@ -111,6 +113,10 @@ fun ComposeScreen(
         replyToId?.let { viewModel.setReplyTarget(it) }
     }
 
+    LaunchedEffect(quotedPostId) {
+        quotedPostId?.let { viewModel.setQuotedPost(it) }
+    }
+
     LaunchedEffect(uiState.isPosted) {
         if (uiState.isPosted) {
             onPostSuccess()
@@ -128,7 +134,11 @@ fun ComposeScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             CompactTopBar(
-                title = if (replyToId != null) stringResource(R.string.reply) else stringResource(R.string.compose),
+                title = when {
+                    replyToId != null -> stringResource(R.string.reply)
+                    quotedPostId != null -> stringResource(R.string.quoting)
+                    else -> stringResource(R.string.compose)
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -168,6 +178,15 @@ fun ComposeScreen(
                     post = uiState.replyTargetPost!!,
                     modifier = Modifier.alpha(0.6f)
                 )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Quoted post preview
+            if (uiState.isLoadingQuotedPost) {
+                QuoteIndicator(isLoading = true)
+                Spacer(modifier = Modifier.height(12.dp))
+            } else if (uiState.quotedPost != null) {
+                QuoteIndicator(isLoading = false, post = uiState.quotedPost)
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
@@ -329,6 +348,85 @@ fun ComposeScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuoteIndicator(
+    isLoading: Boolean,
+    post: Post? = null
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.FormatQuote,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = stringResource(R.string.quoting),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (isLoading) {
+                Spacer(modifier = Modifier.height(8.dp))
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp
+                )
+            } else if (post != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AsyncImage(
+                        model = post.actor.avatarUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = post.actor.name ?: post.actor.handle,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "@${post.actor.handle}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = post.excerpt,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
