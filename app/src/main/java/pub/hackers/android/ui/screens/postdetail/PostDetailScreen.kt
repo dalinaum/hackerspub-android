@@ -65,8 +65,10 @@ import coil.compose.AsyncImage
 import pub.hackers.android.R
 import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.ReactionGroup
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
+import pub.hackers.android.ui.components.LoadingItem
 import pub.hackers.android.ui.components.HtmlContent
 import pub.hackers.android.ui.components.MediaGrid
 import android.content.Intent
@@ -242,37 +244,45 @@ fun PostDetailScreen(
                     )
                 }
                 uiState.post != null -> {
-                    PostDetailContent(
-                        post = uiState.post!!,
-                        reactionGroups = uiState.reactionGroups,
-                        replies = uiState.replies,
-                        onProfileClick = onProfileClick,
-                        onPostClick = onPostClick,
-                        onShareClick = {
-                            if (uiState.post!!.viewerHasShared) {
-                                viewModel.unsharePost()
-                            } else {
-                                viewModel.sharePost()
-                            }
-                        },
-                        onReactionClick = { emoji -> viewModel.toggleReaction(emoji) },
-                        onReactionPickerClick = { viewModel.toggleReactionPicker() },
-                        onQuoteClick = { onQuoteClick(postId) },
-                        onSharesClick = { viewModel.showSharesSheet() },
-                        onQuotesClick = { viewModel.showQuotesSheet() },
-                        onExternalShareClick = {
-                            val shareUrl = uiState.post?.url
-                                ?: uiState.post?.iri
-                            if (shareUrl != null) {
-                                val sendIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_TEXT, shareUrl)
-                                    type = "text/plain"
+                    PullToRefreshBox(
+                        isRefreshing = uiState.isRefreshing,
+                        onRefresh = { viewModel.refresh() }
+                    ) {
+                        PostDetailContent(
+                            post = uiState.post!!,
+                            reactionGroups = uiState.reactionGroups,
+                            replies = uiState.replies,
+                            hasMoreReplies = uiState.hasMoreReplies,
+                            isLoadingMoreReplies = uiState.isLoadingMoreReplies,
+                            onLoadMoreReplies = { viewModel.loadMoreReplies() },
+                            onProfileClick = onProfileClick,
+                            onPostClick = onPostClick,
+                            onShareClick = {
+                                if (uiState.post!!.viewerHasShared) {
+                                    viewModel.unsharePost()
+                                } else {
+                                    viewModel.sharePost()
                                 }
-                                context.startActivity(Intent.createChooser(sendIntent, null))
+                            },
+                            onReactionClick = { emoji -> viewModel.toggleReaction(emoji) },
+                            onReactionPickerClick = { viewModel.toggleReactionPicker() },
+                            onQuoteClick = { onQuoteClick(postId) },
+                            onSharesClick = { viewModel.showSharesSheet() },
+                            onQuotesClick = { viewModel.showQuotesSheet() },
+                            onExternalShareClick = {
+                                val shareUrl = uiState.post?.url
+                                    ?: uiState.post?.iri
+                                if (shareUrl != null) {
+                                    val sendIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, null))
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -327,6 +337,9 @@ private fun PostDetailContent(
     post: Post,
     reactionGroups: List<ReactionGroup>,
     replies: List<Post>,
+    hasMoreReplies: Boolean = false,
+    isLoadingMoreReplies: Boolean = false,
+    onLoadMoreReplies: () -> Unit = {},
     onProfileClick: (String) -> Unit,
     onPostClick: (String) -> Unit,
     onShareClick: () -> Unit,
@@ -563,6 +576,23 @@ private fun PostDetailContent(
                     onQuotedPostClick = onPostClick
                 )
                 HorizontalDivider(thickness = 0.5.dp)
+            }
+
+            if (isLoadingMoreReplies) {
+                item {
+                    LoadingItem()
+                }
+            } else if (hasMoreReplies) {
+                item {
+                    TextButton(
+                        onClick = onLoadMoreReplies,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
+                        Text(stringResource(R.string.load_more))
+                    }
+                }
             }
         }
     }

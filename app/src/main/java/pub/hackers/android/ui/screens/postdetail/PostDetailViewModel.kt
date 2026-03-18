@@ -22,6 +22,10 @@ data class PostDetailUiState(
     val reactionGroups: List<ReactionGroup> = emptyList(),
     val replies: List<Post> = emptyList(),
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val isLoadingMoreReplies: Boolean = false,
+    val hasMoreReplies: Boolean = false,
+    val repliesEndCursor: String? = null,
     val error: String? = null,
     val canDelete: Boolean = false,
     val isDeleting: Boolean = false,
@@ -69,6 +73,8 @@ class PostDetailViewModel @Inject constructor(
                             post = result.post,
                             reactionGroups = result.reactionGroups,
                             replies = result.replies,
+                            hasMoreReplies = result.hasMoreReplies,
+                            repliesEndCursor = result.repliesEndCursor,
                             isLoading = false,
                             canDelete = canDelete
                         )
@@ -81,6 +87,59 @@ class PostDetailViewModel @Inject constructor(
                             isLoading = false
                         )
                     }
+                }
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true) }
+
+            repository.getPostDetail(postId)
+                .onSuccess { result ->
+                    val viewerHandle = sessionManager.userHandle.first()
+                    val canDelete = viewerHandle != null &&
+                        result.post.actor.handle.equals(viewerHandle, ignoreCase = true) &&
+                        result.post.sharedPost == null
+
+                    _uiState.update {
+                        it.copy(
+                            post = result.post,
+                            reactionGroups = result.reactionGroups,
+                            replies = result.replies,
+                            hasMoreReplies = result.hasMoreReplies,
+                            repliesEndCursor = result.repliesEndCursor,
+                            isRefreshing = false,
+                            canDelete = canDelete
+                        )
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isRefreshing = false) }
+                }
+        }
+    }
+
+    fun loadMoreReplies() {
+        val state = _uiState.value
+        if (!state.hasMoreReplies || state.isLoadingMoreReplies) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMoreReplies = true) }
+
+            repository.getPostDetail(postId, repliesAfter = state.repliesEndCursor)
+                .onSuccess { result ->
+                    _uiState.update {
+                        it.copy(
+                            replies = it.replies + result.replies,
+                            hasMoreReplies = result.hasMoreReplies,
+                            repliesEndCursor = result.repliesEndCursor,
+                            isLoadingMoreReplies = false
+                        )
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isLoadingMoreReplies = false) }
                 }
         }
     }
