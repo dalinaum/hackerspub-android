@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.outlined.AddReaction
 import androidx.compose.material.icons.outlined.FormatQuote
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
@@ -68,6 +69,8 @@ import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
 import pub.hackers.android.ui.components.MediaGrid
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 import pub.hackers.android.ui.components.PostCard
 import pub.hackers.android.ui.components.QuotedPostPreview
 import pub.hackers.android.ui.components.ReactionPicker
@@ -86,6 +89,7 @@ fun PostDetailScreen(
     viewModel: PostDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     // Navigate back after successful deletion
@@ -254,7 +258,19 @@ fun PostDetailScreen(
                         onReactionPickerClick = { viewModel.toggleReactionPicker() },
                         onQuoteClick = { onQuoteClick(postId) },
                         onSharesClick = { viewModel.showSharesSheet() },
-                        onQuotesClick = { viewModel.showQuotesSheet() }
+                        onQuotesClick = { viewModel.showQuotesSheet() },
+                        onExternalShareClick = {
+                            val shareUrl = uiState.post?.url
+                                ?: uiState.post?.iri
+                            if (shareUrl != null) {
+                                val sendIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, null))
+                            }
+                        }
                     )
                 }
             }
@@ -317,7 +333,8 @@ private fun PostDetailContent(
     onReactionPickerClick: () -> Unit,
     onQuoteClick: () -> Unit,
     onSharesClick: () -> Unit,
-    onQuotesClick: () -> Unit
+    onQuotesClick: () -> Unit,
+    onExternalShareClick: () -> Unit
 ) {
     val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a")
         .withZone(ZoneId.systemDefault())
@@ -508,6 +525,13 @@ private fun PostDetailContent(
                         Icon(
                             imageVector = Icons.Outlined.FormatQuote,
                             contentDescription = stringResource(R.string.quotes),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onExternalShareClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.Share,
+                            contentDescription = stringResource(R.string.share),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
