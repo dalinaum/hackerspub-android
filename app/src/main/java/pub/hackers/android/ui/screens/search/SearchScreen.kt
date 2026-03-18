@@ -1,5 +1,6 @@
 package pub.hackers.android.ui.screens.search
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -11,11 +12,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -25,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -43,6 +49,7 @@ fun SearchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
+    val context = LocalContext.current
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -102,8 +109,33 @@ fun SearchScreen(
                     uiState.hasSearched && uiState.posts.isEmpty() -> {
                         ErrorMessage(message = stringResource(R.string.no_results))
                     }
-                    uiState.posts.isNotEmpty() -> {
+                    uiState.posts.isNotEmpty() || uiState.resolvedObjectUrl != null -> {
                         LazyColumn {
+                            if (uiState.resolvedObjectUrl != null) {
+                                item {
+                                    ListItem(
+                                        headlineContent = {
+                                            Text(
+                                                text = uiState.resolvedObjectUrl!!,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        },
+                                        leadingContent = {
+                                            Icon(
+                                                imageVector = Icons.Filled.OpenInBrowser,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        },
+                                        modifier = Modifier.clickable {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uiState.resolvedObjectUrl))
+                                            context.startActivity(intent)
+                                        }
+                                    )
+                                    HorizontalDivider()
+                                }
+                            }
                             items(
                                 items = uiState.posts,
                                 key = { it.id }

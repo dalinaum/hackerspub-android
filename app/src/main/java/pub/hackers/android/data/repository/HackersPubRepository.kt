@@ -24,6 +24,7 @@ import pub.hackers.android.graphql.RemoveFollowerMutation
 import pub.hackers.android.graphql.RemoveReactionFromPostMutation
 import pub.hackers.android.graphql.RevokeSessionMutation
 import pub.hackers.android.graphql.SearchActorsByHandleQuery
+import pub.hackers.android.graphql.SearchObjectQuery
 import pub.hackers.android.graphql.SearchPostQuery
 import pub.hackers.android.graphql.SharePostMutation
 import pub.hackers.android.graphql.UnblockActorMutation
@@ -601,6 +602,20 @@ class HackersPubRepository @Inject constructor(
                         Result.failure(Exception("Not authenticated"))
                     else -> Result.failure(Exception("Unknown error"))
                 }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun searchObject(query: String): Result<String?> {
+        return try {
+            val response = apolloClient.query(SearchObjectQuery(query)).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val url = response.data?.searchObject?.onSearchedObject?.url
+                Result.success(url)
             }
         } catch (e: Exception) {
             Result.failure(e)

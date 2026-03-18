@@ -17,7 +17,8 @@ data class SearchUiState(
     val posts: List<Post> = emptyList(),
     val isLoading: Boolean = false,
     val hasSearched: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val resolvedObjectUrl: String? = null
 )
 
 @HiltViewModel
@@ -37,8 +38,17 @@ class SearchViewModel @Inject constructor(
         if (query.isEmpty()) return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true) }
+            _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true, resolvedObjectUrl = null) }
 
+            // Try searchObject first for URL/handle resolution
+            repository.searchObject(query)
+                .onSuccess { url ->
+                    if (url != null) {
+                        _uiState.update { it.copy(resolvedObjectUrl = url) }
+                    }
+                }
+
+            // Always search posts too
             repository.searchPosts(query)
                 .onSuccess { posts ->
                     _uiState.update {
@@ -57,6 +67,10 @@ class SearchViewModel @Inject constructor(
                     }
                 }
         }
+    }
+
+    fun consumeResolvedUrl() {
+        _uiState.update { it.copy(resolvedObjectUrl = null) }
     }
 
     fun clearSearch() {
