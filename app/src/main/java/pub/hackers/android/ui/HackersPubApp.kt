@@ -311,6 +311,9 @@ fun HackersPubApp(
                     },
                     onPostClick = { postId ->
                         navController.navigate(DetailScreen.PostDetail.createRoute(postId))
+                    },
+                    onProfileClick = { profileHandle ->
+                        navController.navigate(DetailScreen.Profile.createRoute(profileHandle))
                     }
                 )
             }

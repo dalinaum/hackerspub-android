@@ -68,6 +68,7 @@ fun ProfileScreen(
     handle: String,
     onNavigateBack: () -> Unit,
     onPostClick: (String) -> Unit,
+    onProfileClick: (String) -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -172,7 +173,7 @@ fun ProfileScreen(
                                 PostCard(
                                     post = post,
                                     onClick = { onPostClick(post.sharedPost?.id ?: post.id) },
-                                    onProfileClick = {},
+                                    onProfileClick = onProfileClick,
                                     onQuotedPostClick = onPostClick
                                 )
                                 HorizontalDivider(thickness = 0.5.dp)
