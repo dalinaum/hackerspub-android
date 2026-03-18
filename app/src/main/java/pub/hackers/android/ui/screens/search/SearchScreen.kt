@@ -15,6 +15,10 @@ import androidx.compose.material.icons.Icons
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.HorizontalDivider
@@ -30,6 +34,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
@@ -37,6 +43,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import pub.hackers.android.R
+import coil.compose.AsyncImage
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.PostCard
@@ -109,7 +116,7 @@ fun SearchScreen(
                     uiState.hasSearched && uiState.posts.isEmpty() -> {
                         ErrorMessage(message = stringResource(R.string.no_results))
                     }
-                    uiState.posts.isNotEmpty() || uiState.resolvedObjectUrl != null -> {
+                    uiState.posts.isNotEmpty() || uiState.resolvedObjectUrl != null || uiState.actors.isNotEmpty() -> {
                         LazyColumn {
                             if (uiState.resolvedObjectUrl != null) {
                                 item {
@@ -136,6 +143,42 @@ fun SearchScreen(
                                     HorizontalDivider()
                                 }
                             }
+
+                            if (uiState.actors.isNotEmpty()) {
+                                items(
+                                    items = uiState.actors,
+                                    key = { "actor-${it.id}" }
+                                ) { actor ->
+                                    ListItem(
+                                        headlineContent = {
+                                            Text(
+                                                text = actor.name ?: actor.handle,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        },
+                                        supportingContent = {
+                                            Text(
+                                                text = "@${actor.handle}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        },
+                                        leadingContent = {
+                                            AsyncImage(
+                                                model = actor.avatarUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(40.dp)
+                                                    .clip(CircleShape),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        },
+                                        modifier = Modifier.clickable { onProfileClick(actor.handle) }
+                                    )
+                                    HorizontalDivider(thickness = 0.5.dp)
+                                }
+                            }
+
                             items(
                                 items = uiState.posts,
                                 key = { it.id }

@@ -9,11 +9,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import pub.hackers.android.data.repository.HackersPubRepository
+import pub.hackers.android.domain.model.Actor
 import pub.hackers.android.domain.model.Post
 import javax.inject.Inject
 
 data class SearchUiState(
     val query: String = "",
+    val actors: List<Actor> = emptyList(),
     val posts: List<Post> = emptyList(),
     val isLoading: Boolean = false,
     val hasSearched: Boolean = false,
@@ -38,7 +40,7 @@ class SearchViewModel @Inject constructor(
         if (query.isEmpty()) return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true, resolvedObjectUrl = null) }
+            _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true, resolvedObjectUrl = null, actors = emptyList()) }
 
             // Try searchObject first for URL/handle resolution
             repository.searchObject(query)
@@ -47,6 +49,15 @@ class SearchViewModel @Inject constructor(
                         _uiState.update { it.copy(resolvedObjectUrl = url) }
                     }
                 }
+
+            // Search actors if query looks like a handle
+            if (query.startsWith("@") || query.contains("@")) {
+                val handleQuery = query.removePrefix("@")
+                repository.searchActorsByHandle(handleQuery, limit = 5)
+                    .onSuccess { actors ->
+                        _uiState.update { it.copy(actors = actors) }
+                    }
+            }
 
             // Always search posts too
             repository.searchPosts(query)
