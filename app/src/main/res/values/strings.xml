@@ -69,6 +69,20 @@
     <string name="clear_cache">Clear Cache</string>
     <string name="cache_cleared">Cache cleared</string>
 
+    <!-- Profile -->
+    <string name="follow">Follow</string>
+    <string name="unfollow">Unfollow</string>
+    <string name="block">Block</string>
+    <string name="unblock">Unblock</string>
+    <string name="remove_follower">Remove follower</string>
+    <string name="follows_you">Follows you</string>
+    <string name="blocked">Blocked</string>
+    <string name="action_error">Error</string>
+    <string name="ok">OK</string>
+    <string name="delete_post">Delete</string>
+    <string name="delete_post_confirm">Are you sure you want to delete this post?</string>
+    <string name="delete_post_confirm_title">Delete Post</string>
+
     <!-- Errors -->
     <string name="error_generic">Something went wrong</string>
     <string name="error_network">Network error. Please check your connection.</string>

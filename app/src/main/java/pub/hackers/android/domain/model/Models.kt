@@ -168,5 +168,9 @@ data class ProfileResult(
     val bio: String?,
     val posts: List<Post>,
     val hasNextPage: Boolean,
-    val endCursor: String?
+    val endCursor: String?,
+    val isViewer: Boolean = false,
+    val viewerFollows: Boolean = false,
+    val followsViewer: Boolean = false,
+    val viewerBlocks: Boolean = false
 )

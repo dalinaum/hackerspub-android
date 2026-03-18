@@ -234,6 +234,10 @@ query ActorByHandle($handle: String!, $after: String) {
     actorByHandle(handle: $handle, allowLocalHandle: true) {
         id
         handle
+        isViewer
+        viewerFollows
+        followsViewer
+        viewerBlocks
         name
         bio
         avatarUrl
@@ -411,5 +415,117 @@ query SearchActorsByHandle($prefix: String!, $limit: Int = 10) {
         handle
         name
         avatarUrl
+    }
+}
+
+mutation FollowActor($actorId: ID!) {
+    followActor(input: { actorId: $actorId }) {
+        ... on FollowActorPayload {
+            followee {
+                id
+            }
+            follower {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation UnfollowActor($actorId: ID!) {
+    unfollowActor(input: { actorId: $actorId }) {
+        ... on UnfollowActorPayload {
+            followee {
+                id
+            }
+            follower {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation BlockActor($actorId: ID!) {
+    blockActor(input: { actorId: $actorId }) {
+        ... on BlockActorPayload {
+            blockee {
+                id
+            }
+            blocker {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation UnblockActor($actorId: ID!) {
+    unblockActor(input: { actorId: $actorId }) {
+        ... on UnblockActorPayload {
+            blockee {
+                id
+            }
+            blocker {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation RemoveFollower($actorId: ID!) {
+    removeFollower(input: { actorId: $actorId }) {
+        ... on RemoveFollowerPayload {
+            followee {
+                id
+            }
+            follower {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation DeletePost($id: ID!) {
+    deletePost(input: { id: $id }) {
+        ... on DeletePostPayload {
+            deletedPostId
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+        ... on SharedPostDeletionNotAllowedError {
+            inputPath
+        }
     }
 }
