@@ -25,7 +25,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.outlined.AddReaction
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.outlined.FormatQuote
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
@@ -478,11 +481,40 @@ private fun PostDetailContent(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = dateFormatter.format(post.published),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = dateFormatter.format(post.published),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    if (post.visibility != pub.hackers.android.domain.model.PostVisibility.PUBLIC) {
+                        Text(
+                            text = "\u00B7",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Icon(
+                            imageVector = when (post.visibility) {
+                                pub.hackers.android.domain.model.PostVisibility.UNLISTED -> Icons.Outlined.Lock
+                                pub.hackers.android.domain.model.PostVisibility.FOLLOWERS -> Icons.Outlined.Group
+                                pub.hackers.android.domain.model.PostVisibility.DIRECT -> Icons.Outlined.Lock
+                                else -> Icons.Filled.Public
+                            },
+                            contentDescription = when (post.visibility) {
+                                pub.hackers.android.domain.model.PostVisibility.UNLISTED -> "Unlisted"
+                                pub.hackers.android.domain.model.PostVisibility.FOLLOWERS -> "Followers only"
+                                pub.hackers.android.domain.model.PostVisibility.DIRECT -> "Direct"
+                                else -> "Public"
+                            },
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
