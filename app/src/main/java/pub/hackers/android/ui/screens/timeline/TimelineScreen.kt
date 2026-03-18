@@ -31,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 import pub.hackers.android.R
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
@@ -48,6 +50,7 @@ fun TimelineScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
@@ -136,6 +139,18 @@ fun TimelineScreen(
                                     },
                                     onQuoteClick = { onQuoteClick(post.sharedPost?.id ?: post.id) },
                                     onReactionClick = { onPostClick(post.sharedPost?.id ?: post.id) },
+                                    onExternalShareClick = {
+                                        val displayPost = post.sharedPost ?: post
+                                        val shareUrl = displayPost.url ?: displayPost.iri
+                                        if (shareUrl != null) {
+                                            val sendIntent = Intent().apply {
+                                                action = Intent.ACTION_SEND
+                                                putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                                type = "text/plain"
+                                            }
+                                            context.startActivity(Intent.createChooser(sendIntent, null))
+                                        }
+                                    },
                                     onQuotedPostClick = onPostClick
                                 )
                                 HorizontalDivider(thickness = 0.5.dp)

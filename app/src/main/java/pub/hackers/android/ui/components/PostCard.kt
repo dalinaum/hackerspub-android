@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Favorite
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material3.Card
@@ -55,6 +56,7 @@ fun PostCard(
     onShareClick: (() -> Unit)? = null,
     onQuoteClick: (() -> Unit)? = null,
     onReactionClick: (() -> Unit)? = null,
+    onExternalShareClick: (() -> Unit)? = null,
     onQuotedPostClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -233,7 +235,8 @@ fun PostCard(
                 onReplyClick = onReplyClick,
                 onShareClick = onShareClick,
                 onQuoteClick = onQuoteClick,
-                onReactionClick = onReactionClick
+                onReactionClick = onReactionClick,
+                onExternalShareClick = onExternalShareClick
             )
         }
     }
@@ -245,7 +248,8 @@ private fun EngagementBar(
     onReplyClick: (() -> Unit)?,
     onShareClick: (() -> Unit)?,
     onQuoteClick: (() -> Unit)? = null,
-    onReactionClick: (() -> Unit)? = null
+    onReactionClick: (() -> Unit)? = null,
+    onExternalShareClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -280,6 +284,20 @@ private fun EngagementBar(
             contentDescription = stringResource(R.string.quotes),
             onClick = onQuoteClick
         )
+
+        if (onExternalShareClick != null) {
+            IconButton(
+                onClick = onExternalShareClick,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Share,
+                    contentDescription = stringResource(R.string.share),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
     }
 }
 
