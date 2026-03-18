@@ -290,6 +290,12 @@ fun ComposeScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                Text(
+                    text = uiState.language.uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
                 TextButton(
                     onClick = { showVisibilityMenu = true }
                 ) {

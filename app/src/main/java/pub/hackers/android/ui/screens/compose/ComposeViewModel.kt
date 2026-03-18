@@ -12,15 +12,22 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import android.icu.util.ULocale
+import android.os.Build
+import android.view.textclassifier.TextClassificationManager
+import android.view.textclassifier.TextLanguage
 import pub.hackers.android.data.repository.HackersPubRepository
 import pub.hackers.android.domain.model.Actor
 import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.PostVisibility
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import javax.inject.Inject
 
 data class ComposeUiState(
     val content: String = "",
     val cursorPosition: Int = 0,
+    val language: String = java.util.Locale.getDefault().language,
     val visibility: PostVisibility = PostVisibility.PUBLIC,
     val replyToId: String? = null,
     val replyTargetPost: Post? = null,
@@ -41,7 +48,8 @@ data class ComposeUiState(
 @OptIn(FlowPreview::class)
 @HiltViewModel
 class ComposeViewModel @Inject constructor(
-    private val repository: HackersPubRepository
+    private val repository: HackersPubRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ComposeUiState())
@@ -241,6 +249,31 @@ class ComposeViewModel @Inject constructor(
 
         // Check for mention trigger
         detectMentionTrigger(content, cursorPosition)
+
+        // Detect language
+        detectLanguage(content)
+    }
+
+    private fun detectLanguage(text: String) {
+        if (text.isBlank() || text.length < 20) return
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val tcm = context.getSystemService(Context.TEXT_CLASSIFICATION_SERVICE) as? TextClassificationManager
+                val classifier = tcm?.textClassifier ?: return
+                val request = TextLanguage.Request.Builder(text).build()
+                val result = classifier.detectLanguage(request)
+                if (result.localeHypothesisCount > 0) {
+                    val topLocale = result.getLocale(0)
+                    val lang = topLocale.language
+                    if (lang.isNotEmpty()) {
+                        _uiState.update { it.copy(language = lang) }
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // Fallback: keep current language
+        }
     }
 
     fun updateVisibility(visibility: PostVisibility) {
@@ -256,6 +289,7 @@ class ComposeViewModel @Inject constructor(
 
             repository.createNote(
                 content = state.content,
+                language = state.language,
                 visibility = state.visibility,
                 replyTargetId = state.replyToId,
                 quotedPostId = state.quotedPostId
