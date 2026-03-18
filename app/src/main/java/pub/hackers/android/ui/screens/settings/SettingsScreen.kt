@@ -48,6 +48,7 @@ import pub.hackers.android.R
 fun SettingsScreen(
     onSignInClick: () -> Unit,
     onSignOutComplete: () -> Unit,
+    onProfileClick: (String) -> Unit = {},
     isLoggedIn: Boolean,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -107,6 +108,9 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clickable {
+                            uiState.userHandle?.let { onProfileClick(it) }
+                        }
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
