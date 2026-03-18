@@ -281,6 +281,7 @@ query PostDetail($id: ID!, $repliesAfter: String) {
                             }
                         }
                         totalCount
+                        viewerHasReacted
                     }
                 }
                 ... on CustomEmojiReactionGroup {
@@ -296,6 +297,7 @@ query PostDetail($id: ID!, $repliesAfter: String) {
                             }
                         }
                         totalCount
+                        viewerHasReacted
                     }
                 }
             }
@@ -526,6 +528,36 @@ mutation DeletePost($id: ID!) {
         }
         ... on SharedPostDeletionNotAllowedError {
             inputPath
+        }
+    }
+}
+
+mutation AddReactionToPost($postId: ID!, $emoji: String!) {
+    addReactionToPost(input: { postId: $postId, emoji: $emoji }) {
+        ... on AddReactionToPostPayload {
+            reaction {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation RemoveReactionFromPost($postId: ID!, $emoji: String!) {
+    removeReactionFromPost(input: { postId: $postId, emoji: $emoji }) {
+        ... on RemoveReactionFromPostPayload {
+            success
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
         }
     }
 }

@@ -25,7 +25,9 @@ data class PostDetailUiState(
     val canDelete: Boolean = false,
     val isDeleting: Boolean = false,
     val deleteError: String? = null,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val isReacting: Boolean = false,
+    val showReactionPicker: Boolean = false
 )
 
 @HiltViewModel
@@ -136,5 +138,78 @@ class PostDetailViewModel @Inject constructor(
 
     fun dismissDeleteError() {
         _uiState.update { it.copy(deleteError = null) }
+    }
+
+    fun toggleReactionPicker() {
+        _uiState.update { it.copy(showReactionPicker = !it.showReactionPicker) }
+    }
+
+    fun toggleReaction(emoji: String) {
+        if (_uiState.value.isReacting) return
+
+        val existingGroup = _uiState.value.reactionGroups.find { it.emoji == emoji }
+        val viewerHasReacted = existingGroup?.viewerHasReacted == true
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isReacting = true) }
+
+            val result = if (viewerHasReacted) {
+                repository.removeReactionFromPost(postId, emoji)
+            } else {
+                repository.addReactionToPost(postId, emoji)
+            }
+
+            result
+                .onSuccess {
+                    // Optimistically update local state
+                    _uiState.update { state ->
+                        val updatedGroups = if (viewerHasReacted) {
+                            state.reactionGroups.map { group ->
+                                if (group.emoji == emoji) {
+                                    group.copy(
+                                        count = maxOf(0, group.count - 1),
+                                        viewerHasReacted = false
+                                    )
+                                } else group
+                            }.filter { it.count > 0 || it.viewerHasReacted }
+                        } else {
+                            val existing = state.reactionGroups.find { it.emoji == emoji }
+                            if (existing != null) {
+                                state.reactionGroups.map { group ->
+                                    if (group.emoji == emoji) {
+                                        group.copy(
+                                            count = group.count + 1,
+                                            viewerHasReacted = true
+                                        )
+                                    } else group
+                                }
+                            } else {
+                                state.reactionGroups + ReactionGroup(
+                                    emoji = emoji,
+                                    customEmoji = null,
+                                    count = 1,
+                                    reactors = emptyList(),
+                                    viewerHasReacted = true
+                                )
+                            }
+                        }
+
+                        val totalReactions = updatedGroups.sumOf { it.count }
+
+                        state.copy(
+                            reactionGroups = updatedGroups,
+                            isReacting = false,
+                            post = state.post?.copy(
+                                engagementStats = state.post.engagementStats.copy(
+                                    reactions = totalReactions
+                                )
+                            )
+                        )
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isReacting = false) }
+                }
+        }
     }
 }

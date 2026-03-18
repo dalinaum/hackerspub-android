@@ -22,11 +22,16 @@ import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.outlined.AddReaction
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -62,9 +67,11 @@ import pub.hackers.android.ui.components.HtmlContent
 import pub.hackers.android.ui.components.MediaGrid
 import pub.hackers.android.ui.components.PostCard
 import pub.hackers.android.ui.components.QuotedPostPreview
+import pub.hackers.android.ui.components.ReactionPicker
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailScreen(
     postId: String,
@@ -81,6 +88,21 @@ fun PostDetailScreen(
     LaunchedEffect(uiState.isDeleted) {
         if (uiState.isDeleted) {
             onNavigateBack()
+        }
+    }
+
+    // Reaction picker bottom sheet
+    if (uiState.showReactionPicker) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.toggleReactionPicker() },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            ReactionPicker(
+                reactionGroups = uiState.reactionGroups,
+                isSubmitting = uiState.isReacting,
+                onEmojiSelect = { viewModel.toggleReaction(it) },
+                onClose = { viewModel.toggleReactionPicker() }
+            )
         }
     }
 
@@ -187,7 +209,9 @@ fun PostDetailScreen(
                             } else {
                                 viewModel.sharePost()
                             }
-                        }
+                        },
+                        onReactionClick = { emoji -> viewModel.toggleReaction(emoji) },
+                        onReactionPickerClick = { viewModel.toggleReactionPicker() }
                     )
                 }
             }
@@ -245,7 +269,9 @@ private fun PostDetailContent(
     replies: List<Post>,
     onProfileClick: (String) -> Unit,
     onPostClick: (String) -> Unit,
-    onShareClick: () -> Unit
+    onShareClick: () -> Unit,
+    onReactionClick: (String) -> Unit,
+    onReactionPickerClick: () -> Unit
 ) {
     val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a")
         .withZone(ZoneId.systemDefault())
@@ -363,9 +389,15 @@ private fun PostDetailContent(
                     Row {
                         reactionGroups.forEach { group ->
                             Card(
+                                onClick = {
+                                    group.emoji?.let { onReactionClick(it) }
+                                },
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                    containerColor = if (group.viewerHasReacted)
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                    else
+                                        MaterialTheme.colorScheme.surfaceVariant
                                 ),
                                 modifier = Modifier.padding(end = 8.dp)
                             ) {
@@ -385,7 +417,11 @@ private fun PostDetailContent(
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = group.count.toString(),
-                                        style = MaterialTheme.typography.bodySmall
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (group.viewerHasReacted)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -401,6 +437,16 @@ private fun PostDetailContent(
                             imageVector = Icons.Filled.Repeat,
                             contentDescription = stringResource(R.string.share),
                             tint = if (post.viewerHasShared)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onReactionPickerClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.AddReaction,
+                            contentDescription = stringResource(R.string.reactions),
+                            tint = if (reactionGroups.any { it.viewerHasReacted })
                                 MaterialTheme.colorScheme.primary
                             else
                                 MaterialTheme.colorScheme.onSurfaceVariant

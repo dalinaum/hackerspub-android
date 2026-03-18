@@ -114,7 +114,8 @@ data class ReactionGroup(
     val emoji: String?,
     val customEmoji: CustomEmoji?,
     val count: Int,
-    val reactors: List<Actor>
+    val reactors: List<Actor>,
+    val viewerHasReacted: Boolean = false
 )
 
 data class Viewer(

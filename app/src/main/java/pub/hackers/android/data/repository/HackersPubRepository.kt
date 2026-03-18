@@ -6,6 +6,7 @@ import com.apollographql.apollo.cache.normalized.FetchPolicy
 import com.apollographql.apollo.cache.normalized.fetchPolicy
 import pub.hackers.android.domain.model.*
 import pub.hackers.android.graphql.ActorByHandleQuery
+import pub.hackers.android.graphql.AddReactionToPostMutation
 import pub.hackers.android.graphql.BlockActorMutation
 import pub.hackers.android.graphql.CompleteLoginChallengeMutation
 import pub.hackers.android.graphql.CreateNoteMutation
@@ -18,6 +19,7 @@ import pub.hackers.android.graphql.PersonalTimelineQuery
 import pub.hackers.android.graphql.PostDetailQuery
 import pub.hackers.android.graphql.PublicTimelineQuery
 import pub.hackers.android.graphql.RemoveFollowerMutation
+import pub.hackers.android.graphql.RemoveReactionFromPostMutation
 import pub.hackers.android.graphql.RevokeSessionMutation
 import pub.hackers.android.graphql.SearchActorsByHandleQuery
 import pub.hackers.android.graphql.SearchPostQuery
@@ -183,7 +185,8 @@ class HackersPubRepository @Inject constructor(
                             count = group.onEmojiReactionGroup.reactors.totalCount,
                             reactors = group.onEmojiReactionGroup.reactors.edges.map {
                                 it.node.actorFields.toActor()
-                            }
+                            },
+                            viewerHasReacted = group.onEmojiReactionGroup.reactors.viewerHasReacted
                         )
                         group.onCustomEmojiReactionGroup != null -> ReactionGroup(
                             emoji = null,
@@ -195,7 +198,8 @@ class HackersPubRepository @Inject constructor(
                             count = group.onCustomEmojiReactionGroup.reactors.totalCount,
                             reactors = group.onCustomEmojiReactionGroup.reactors.edges.map {
                                 it.node.actorFields.toActor()
-                            }
+                            },
+                            viewerHasReacted = group.onCustomEmojiReactionGroup.reactors.viewerHasReacted
                         )
                         else -> null
                     }
@@ -587,6 +591,52 @@ class HackersPubRepository @Inject constructor(
                 val result = response.data?.removeFollower
                 when {
                     result?.onRemoveFollowerPayload != null -> Result.success(Unit)
+                    result?.onInvalidInputError != null ->
+                        Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+                    result?.onNotAuthenticatedError != null ->
+                        Result.failure(Exception("Not authenticated"))
+                    else -> Result.failure(Exception("Unknown error"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun addReactionToPost(postId: String, emoji: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(
+                AddReactionToPostMutation(postId = postId, emoji = emoji)
+            ).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val result = response.data?.addReactionToPost
+                when {
+                    result?.onAddReactionToPostPayload != null -> Result.success(Unit)
+                    result?.onInvalidInputError != null ->
+                        Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+                    result?.onNotAuthenticatedError != null ->
+                        Result.failure(Exception("Not authenticated"))
+                    else -> Result.failure(Exception("Unknown error"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun removeReactionFromPost(postId: String, emoji: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(
+                RemoveReactionFromPostMutation(postId = postId, emoji = emoji)
+            ).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val result = response.data?.removeReactionFromPost
+                when {
+                    result?.onRemoveReactionFromPostPayload != null -> Result.success(Unit)
                     result?.onInvalidInputError != null ->
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
                     result?.onNotAuthenticatedError != null ->
