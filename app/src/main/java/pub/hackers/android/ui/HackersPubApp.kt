@@ -206,6 +206,9 @@ fun HackersPubApp(
                     onQuoteClick = { postId ->
                         navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
                     },
+                    onComposeClick = {
+                        navController.navigate(DetailScreen.Compose.createRoute())
+                    },
                     onSignInClick = {
                         navController.navigate(DetailScreen.SignIn.route)
                     },

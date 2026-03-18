@@ -8,8 +8,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -45,6 +49,7 @@ fun ExploreScreen(
     onProfileClick: (String) -> Unit,
     onReplyClick: (String) -> Unit,
     onQuoteClick: (String) -> Unit = {},
+    onComposeClick: () -> Unit = {},
     onSignInClick: () -> Unit,
     isLoggedIn: Boolean,
     viewModel: ExploreViewModel = hiltViewModel()
@@ -93,6 +98,16 @@ fun ExploreScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            if (isLoggedIn) {
+                FloatingActionButton(onClick = onComposeClick) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.compose)
+                    )
+                }
+            }
         }
     ) { paddingValues ->
         Column(
