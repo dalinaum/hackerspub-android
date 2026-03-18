@@ -295,7 +295,8 @@ fun HackersPubApp(
                     },
                     onPostClick = { id ->
                         navController.navigate(DetailScreen.PostDetail.createRoute(id))
-                    }
+                    },
+                    isLoggedIn = isLoggedIn
                 )
             }
 

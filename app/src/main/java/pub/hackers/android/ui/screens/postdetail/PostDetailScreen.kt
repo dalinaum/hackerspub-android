@@ -86,6 +86,7 @@ fun PostDetailScreen(
     onReplyClick: (String) -> Unit,
     onQuoteClick: (String) -> Unit = {},
     onPostClick: (String) -> Unit,
+    isLoggedIn: Boolean = true,
     viewModel: PostDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -213,7 +214,7 @@ fun PostDetailScreen(
             )
         },
         floatingActionButton = {
-            if (uiState.post != null) {
+            if (uiState.post != null && isLoggedIn) {
                 FloatingActionButton(
                     onClick = { onReplyClick(postId) }
                 ) {
