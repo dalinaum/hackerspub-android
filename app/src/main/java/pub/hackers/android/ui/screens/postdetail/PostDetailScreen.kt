@@ -94,6 +94,7 @@ fun PostDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showShareConfirmation by remember { mutableStateOf(false) }
 
     // Navigate back after successful deletion
     LaunchedEffect(uiState.isDeleted) {
@@ -179,6 +180,31 @@ fun PostDetailScreen(
         )
     }
 
+    if (showShareConfirmation) {
+        val hasShared = uiState.post?.viewerHasShared == true
+        AlertDialog(
+            onDismissRequest = { showShareConfirmation = false },
+            title = {
+                Text(stringResource(if (hasShared) R.string.unshare_confirm_title else R.string.share_confirm_title))
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showShareConfirmation = false
+                        if (hasShared) viewModel.unsharePost() else viewModel.sharePost()
+                    }
+                ) {
+                    Text(stringResource(if (hasShared) R.string.unshare_confirm_action else R.string.share_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showShareConfirmation = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
     if (uiState.deleteError != null) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissDeleteError() },
@@ -258,11 +284,7 @@ fun PostDetailScreen(
                             onProfileClick = onProfileClick,
                             onPostClick = onPostClick,
                             onShareClick = {
-                                if (uiState.post!!.viewerHasShared) {
-                                    viewModel.unsharePost()
-                                } else {
-                                    viewModel.sharePost()
-                                }
+                                showShareConfirmation = true
                             },
                             onReactionClick = { emoji -> viewModel.toggleReaction(emoji) },
                             onReactionPickerClick = { viewModel.toggleReactionPicker() },

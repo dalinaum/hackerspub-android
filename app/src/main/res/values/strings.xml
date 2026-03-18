@@ -83,6 +83,10 @@
     <string name="delete_post">Delete</string>
     <string name="delete_post_confirm">Are you sure you want to delete this post?</string>
     <string name="delete_post_confirm_title">Delete Post</string>
+    <string name="share_confirm_title">Share this post?</string>
+    <string name="unshare_confirm_title">Unshare this post?</string>
+    <string name="share_confirm_action">Share</string>
+    <string name="unshare_confirm_action">Unshare</string>
 
     <!-- Errors -->
     <string name="error_generic">Something went wrong</string>
