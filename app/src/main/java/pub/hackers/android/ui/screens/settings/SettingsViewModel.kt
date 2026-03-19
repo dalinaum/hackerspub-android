@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import pub.hackers.android.data.local.PreferencesManager
 import pub.hackers.android.data.local.SessionManager
 import pub.hackers.android.data.repository.HackersPubRepository
 import javax.inject.Inject
@@ -23,12 +24,16 @@ data class SettingsUiState(
     val userAvatar: String? = null,
     val appVersion: String = "",
     val isSignedOut: Boolean = false,
-    val message: String? = null
+    val message: String? = null,
+    val confirmBeforeDelete: Boolean = true,
+    val confirmBeforeShare: Boolean = false,
+    val timelineMaxLength: Int = 0
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val sessionManager: SessionManager,
+    private val preferencesManager: PreferencesManager,
     private val repository: HackersPubRepository,
     private val apolloClient: ApolloClient,
     @ApplicationContext private val context: Context
@@ -40,6 +45,7 @@ class SettingsViewModel @Inject constructor(
     init {
         loadUserInfo()
         loadAppVersion()
+        loadPreferences()
     }
 
     private fun loadUserInfo() {
@@ -67,6 +73,37 @@ class SettingsViewModel @Inject constructor(
         } catch (_: Exception) {
             _uiState.update { it.copy(appVersion = "Unknown") }
         }
+    }
+
+    private fun loadPreferences() {
+        viewModelScope.launch {
+            val confirmDelete = preferencesManager.confirmBeforeDelete.first()
+            val confirmShare = preferencesManager.confirmBeforeShare.first()
+            val maxLength = preferencesManager.timelineMaxLength.first()
+
+            _uiState.update {
+                it.copy(
+                    confirmBeforeDelete = confirmDelete,
+                    confirmBeforeShare = confirmShare,
+                    timelineMaxLength = maxLength
+                )
+            }
+        }
+    }
+
+    fun setConfirmBeforeDelete(value: Boolean) {
+        _uiState.update { it.copy(confirmBeforeDelete = value) }
+        viewModelScope.launch { preferencesManager.setConfirmBeforeDelete(value) }
+    }
+
+    fun setConfirmBeforeShare(value: Boolean) {
+        _uiState.update { it.copy(confirmBeforeShare = value) }
+        viewModelScope.launch { preferencesManager.setConfirmBeforeShare(value) }
+    }
+
+    fun setTimelineMaxLength(value: Int) {
+        _uiState.update { it.copy(timelineMaxLength = value) }
+        viewModelScope.launch { preferencesManager.setTimelineMaxLength(value) }
     }
 
     fun signOut() {

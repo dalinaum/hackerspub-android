@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import pub.hackers.android.data.local.PreferencesManager
 import pub.hackers.android.data.local.SessionManager
 import pub.hackers.android.data.repository.HackersPubRepository
 import pub.hackers.android.domain.model.Actor
@@ -45,6 +46,7 @@ data class PostDetailUiState(
 class PostDetailViewModel @Inject constructor(
     private val repository: HackersPubRepository,
     private val sessionManager: SessionManager,
+    val preferencesManager: PreferencesManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 

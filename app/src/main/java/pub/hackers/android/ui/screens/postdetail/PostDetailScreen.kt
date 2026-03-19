@@ -97,6 +97,8 @@ fun PostDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val confirmBeforeDelete by viewModel.preferencesManager.confirmBeforeDelete.collectAsState(initial = true)
+    val confirmBeforeShare by viewModel.preferencesManager.confirmBeforeShare.collectAsState(initial = false)
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showShareConfirmation by remember { mutableStateOf(false) }
 
@@ -239,7 +241,13 @@ fun PostDetailScreen(
                     if (uiState.canDelete) {
                         PostDetailActionMenu(
                             isDeleting = uiState.isDeleting,
-                            onDelete = { showDeleteConfirmation = true }
+                            onDelete = {
+                                if (confirmBeforeDelete) {
+                                    showDeleteConfirmation = true
+                                } else {
+                                    viewModel.deletePost()
+                                }
+                            }
                         )
                     }
                 }
@@ -289,7 +297,15 @@ fun PostDetailScreen(
                             onPostClick = onPostClick,
                             onReplyClick = { onReplyClick(postId) },
                             onShareClick = {
-                                showShareConfirmation = true
+                                if (confirmBeforeShare) {
+                                    showShareConfirmation = true
+                                } else {
+                                    if (uiState.post!!.viewerHasShared) {
+                                        viewModel.unsharePost()
+                                    } else {
+                                        viewModel.sharePost()
+                                    }
+                                }
                             },
                             onReactionClick = { emoji -> viewModel.toggleReaction(emoji) },
                             onReactionPickerClick = { viewModel.toggleReactionPicker() },

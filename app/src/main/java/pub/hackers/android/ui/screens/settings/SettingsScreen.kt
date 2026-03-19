@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -17,7 +20,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -103,6 +109,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
         ) {
             if (isLoggedIn) {
                 Row(
@@ -188,6 +195,95 @@ fun SettingsScreen(
                     )
                 }
             )
+
+            HorizontalDivider()
+
+            // Engagement section
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_engagement),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_confirm_before_delete)) },
+                trailingContent = {
+                    Switch(
+                        checked = uiState.confirmBeforeDelete,
+                        onCheckedChange = { viewModel.setConfirmBeforeDelete(it) }
+                    )
+                }
+            )
+
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_confirm_before_share)) },
+                trailingContent = {
+                    Switch(
+                        checked = uiState.confirmBeforeShare,
+                        onCheckedChange = { viewModel.setConfirmBeforeShare(it) }
+                    )
+                }
+            )
+
+            HorizontalDivider()
+
+            // Timeline section
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_timeline),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            TimelineMaxLengthSetting(
+                currentValue = uiState.timelineMaxLength,
+                onValueChange = { viewModel.setTimelineMaxLength(it) }
+            )
         }
     }
+}
+
+@Composable
+private fun TimelineMaxLengthSetting(
+    currentValue: Int,
+    onValueChange: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val options = listOf(300, 500, 700, 1000, 0)
+
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.settings_timeline_max_length)) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (currentValue == 0) stringResource(R.string.settings_timeline_unlimited) else currentValue.toString(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { expanded = true }
+                )
+
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    options.forEach { value ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    if (value == 0) stringResource(R.string.settings_timeline_unlimited) else value.toString()
+                                )
+                            },
+                            onClick = {
+                                onValueChange(value)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    )
 }
