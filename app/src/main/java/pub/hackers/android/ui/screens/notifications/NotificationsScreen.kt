@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.NotificationsOff
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -28,29 +25,23 @@ import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import pub.hackers.android.ui.components.CompactTopBar
+import pub.hackers.android.ui.components.LargeTitleHeader
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -61,6 +52,9 @@ import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
 import pub.hackers.android.ui.components.LoadingItem
+import pub.hackers.android.ui.theme.AppShapes
+import pub.hackers.android.ui.theme.LocalAppColors
+import pub.hackers.android.ui.theme.LocalAppTypography
 import java.time.Duration
 import java.time.Instant
 
@@ -69,22 +63,12 @@ import java.time.Instant
 fun NotificationsScreen(
     onPostClick: (String) -> Unit,
     onProfileClick: (String) -> Unit,
-    onComposeClick: () -> Unit = {},
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshIfStale()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
 
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -102,15 +86,7 @@ fun NotificationsScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            CompactTopBar(title = stringResource(R.string.nav_notifications))
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onComposeClick) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = stringResource(R.string.compose)
-                )
-            }
+            LargeTitleHeader(title = "Notifications")
         }
     ) { paddingValues ->
         Box(
@@ -129,10 +105,17 @@ fun NotificationsScreen(
                     )
                 }
                 uiState.notifications.isEmpty() -> {
-                    ErrorMessage(
-                        message = stringResource(R.string.no_notifications),
-                        icon = Icons.Outlined.NotificationsOff
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.no_notifications),
+                            style = typography.bodyLarge,
+                            color = colors.textSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
                 else -> {
                     PullToRefreshBox(
@@ -149,7 +132,11 @@ fun NotificationsScreen(
                                     onPostClick = onPostClick,
                                     onProfileClick = onProfileClick
                                 )
-                                HorizontalDivider(thickness = 0.5.dp)
+                                HorizontalDivider(
+                                    color = colors.divider,
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
                             }
 
                             if (uiState.isLoadingMore) {
@@ -171,35 +158,32 @@ private fun NotificationItem(
     onPostClick: (String) -> Unit,
     onProfileClick: (String) -> Unit
 ) {
-    val (icon, iconColor, actionText) = when (notification) {
-        is Notification.Follow -> Triple(
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+
+    val (icon, actionText) = when (notification) {
+        is Notification.Follow -> Pair(
             Icons.Default.PersonAdd,
-            Color(0xFF4CAF50),
             stringResource(R.string.notification_follow)
         )
-        is Notification.Mention -> Triple(
+        is Notification.Mention -> Pair(
             Icons.Outlined.AlternateEmail,
-            Color(0xFF2196F3),
             stringResource(R.string.notification_mention)
         )
-        is Notification.Reply -> Triple(
+        is Notification.Reply -> Pair(
             Icons.Default.Reply,
-            Color(0xFF9C27B0),
             stringResource(R.string.notification_reply)
         )
-        is Notification.Quote -> Triple(
+        is Notification.Quote -> Pair(
             Icons.Default.FormatQuote,
-            Color(0xFFFF9800),
             stringResource(R.string.notification_quote)
         )
-        is Notification.Share -> Triple(
+        is Notification.Share -> Pair(
             Icons.Default.Repeat,
-            Color(0xFF00BCD4),
             stringResource(R.string.notification_share)
         )
-        is Notification.React -> Triple(
+        is Notification.React -> Pair(
             Icons.Default.Favorite,
-            Color(0xFFE91E63),
             notification.emoji?.let { "$it" } ?: stringResource(R.string.notification_react)
         )
     }
@@ -215,9 +199,6 @@ private fun NotificationItem(
 
     val actor = notification.actors.firstOrNull()
 
-    val customEmoji = (notification as? Notification.React)?.customEmoji
-    val emojiChar = (notification as? Notification.React)?.emoji
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -230,26 +211,12 @@ private fun NotificationItem(
             .padding(12.dp),
         verticalAlignment = Alignment.Top
     ) {
-        if (customEmoji != null) {
-            AsyncImage(
-                model = customEmoji.imageUrl,
-                contentDescription = customEmoji.name,
-                modifier = Modifier.size(24.dp)
-            )
-        } else if (emojiChar != null) {
-            Text(
-                text = emojiChar,
-                modifier = Modifier.size(24.dp),
-                style = MaterialTheme.typography.titleMedium
-            )
-        } else {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconColor,
-                modifier = Modifier.size(24.dp)
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = colors.textSecondary,
+            modifier = Modifier.size(24.dp)
+        )
 
         Spacer(modifier = Modifier.width(12.dp))
 
@@ -260,7 +227,7 @@ private fun NotificationItem(
                         model = actor.avatarUrl,
                         contentDescription = null,
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(AppShapes.avatarNotification)
                             .clip(CircleShape)
                             .clickable { onProfileClick(actor.handle) },
                         contentScale = ContentScale.Crop
@@ -270,17 +237,10 @@ private fun NotificationItem(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val actorDisplayName = actor?.name ?: actor?.handle ?: "Someone"
-                        val allActors = notification.actors
-                        val actorLabel = when {
-                            allActors.size == 2 -> "$actorDisplayName and ${allActors[1].name ?: allActors[1].handle}"
-                            allActors.size > 2 -> "$actorDisplayName and ${allActors.size - 1} others"
-                            else -> actorDisplayName
-                        }
                         Text(
-                            text = actorLabel,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            text = actor?.name ?: actor?.handle ?: "Someone",
+                            style = typography.bodyLargeSemiBold,
+                            color = colors.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
@@ -288,39 +248,24 @@ private fun NotificationItem(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = actionText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = typography.bodyLarge,
+                            color = colors.textBody
                         )
                     }
                     Text(
                         text = formatRelativeTime(notification.created),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = typography.labelMedium,
+                        color = colors.textSecondary
                     )
                 }
             }
-
-            val shouldHavePost = notification is Notification.Mention ||
-                notification is Notification.Reply ||
-                notification is Notification.Quote ||
-                notification is Notification.Share ||
-                notification is Notification.React
 
             if (post != null) {
                 Spacer(modifier = Modifier.size(8.dp))
                 HtmlContent(
                     html = post.content,
                     maxLines = 3,
-                    modifier = Modifier.fillMaxWidth(),
-                    onMentionClick = onProfileClick
-                )
-            } else if (shouldHavePost) {
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = stringResource(R.string.notification_post_unavailable),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

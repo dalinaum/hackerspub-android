@@ -221,8 +221,8 @@ fun HackersPubApp(
                     onComposeClick = { replyTo ->
                         navController.navigate(DetailScreen.Compose.createRoute(replyTo))
                     },
-                    onQuoteClick = { postId ->
-                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
+                    onSettingsClick = {
+                        navController.navigate(Screen.Settings.route)
                     }
                 )
             }
@@ -234,9 +234,6 @@ fun HackersPubApp(
                     },
                     onProfileClick = { handle ->
                         navController.navigate(DetailScreen.Profile.createRoute(handle))
-                    },
-                    onComposeClick = {
-                        navController.navigate(DetailScreen.Compose.createRoute())
                     }
                 )
             }
@@ -252,12 +249,6 @@ fun HackersPubApp(
                     onReplyClick = { postId ->
                         navController.navigate(DetailScreen.Compose.createRoute(postId))
                     },
-                    onQuoteClick = { postId ->
-                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
-                    },
-                    onComposeClick = {
-                        navController.navigate(DetailScreen.Compose.createRoute())
-                    },
                     onSignInClick = {
                         navController.navigate(DetailScreen.SignIn.createRoute())
                     },
@@ -272,12 +263,6 @@ fun HackersPubApp(
                     },
                     onProfileClick = { handle ->
                         navController.navigate(DetailScreen.Profile.createRoute(handle))
-                    },
-                    onReplyClick = { postId ->
-                        navController.navigate(DetailScreen.Compose.createRoute(replyTo = postId))
-                    },
-                    onQuoteClick = { postId ->
-                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
                     }
                 )
             }
@@ -291,9 +276,6 @@ fun HackersPubApp(
                         navController.navigate(Screen.Explore.route) {
                             popUpTo(0) { inclusive = true }
                         }
-                    },
-                    onProfileClick = { handle ->
-                        navController.navigate(DetailScreen.Profile.createRoute(handle))
                     },
                     isLoggedIn = isLoggedIn
                 )

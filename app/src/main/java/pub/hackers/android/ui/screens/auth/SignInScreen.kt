@@ -8,22 +8,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import pub.hackers.android.ui.components.CompactTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -31,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -39,6 +38,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import pub.hackers.android.R
+import pub.hackers.android.ui.theme.AppShapes
+import pub.hackers.android.ui.theme.LocalAppColors
+import pub.hackers.android.ui.theme.LocalAppTypography
 
 @Composable
 fun SignInScreen(
@@ -73,19 +75,7 @@ fun SignInScreen(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
-        topBar = {
-            CompactTopBar(
-                title = stringResource(R.string.sign_in),
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                }
-            )
-        },
+        topBar = {},
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Column(
@@ -129,11 +119,23 @@ private fun UsernameStep(
     onSubmit: () -> Unit,
     isLoading: Boolean
 ) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+
+    Text(
+        text = stringResource(R.string.sign_in),
+        style = typography.titleLarge,
+        textAlign = TextAlign.Center,
+        color = colors.textPrimary
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
     Text(
         text = stringResource(R.string.sign_in_description),
-        style = MaterialTheme.typography.bodyLarge,
+        style = typography.bodyMedium,
         textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = colors.textSecondary
     )
 
     Spacer(modifier = Modifier.height(24.dp))
@@ -141,8 +143,24 @@ private fun UsernameStep(
     OutlinedTextField(
         value = username,
         onValueChange = onUsernameChange,
-        label = { Text(stringResource(R.string.username)) },
+        placeholder = {
+            Text(
+                text = stringResource(R.string.username),
+                style = typography.bodyLarge,
+                color = colors.textSecondary
+            )
+        },
+        textStyle = typography.bodyLarge.copy(color = colors.textBody),
         singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = colors.surface,
+            unfocusedContainerColor = colors.surface,
+            disabledContainerColor = colors.surface,
+            unfocusedBorderColor = colors.divider,
+            focusedBorderColor = colors.accent,
+            cursorColor = colors.accent,
+        ),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Text,
             imeAction = ImeAction.Done
@@ -157,15 +175,26 @@ private fun UsernameStep(
     Button(
         onClick = onSubmit,
         enabled = username.isNotBlank() && !isLoading,
+        shape = RoundedCornerShape(AppShapes.pillRadius),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = colors.accent,
+            contentColor = Color.White,
+            disabledContainerColor = colors.accent.copy(alpha = 0.5f),
+            disabledContentColor = Color.White.copy(alpha = 0.5f),
+        ),
         modifier = Modifier.fillMaxWidth()
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                modifier = Modifier.height(20.dp),
-                strokeWidth = 2.dp
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = Color.White
             )
         } else {
-            Text(stringResource(R.string.send_code))
+            Text(
+                text = stringResource(R.string.send_code),
+                style = typography.bodyLarge,
+            )
         }
     }
 }
@@ -178,11 +207,23 @@ private fun VerificationStep(
     onBack: () -> Unit,
     isLoading: Boolean
 ) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+
+    Text(
+        text = stringResource(R.string.sign_in),
+        style = typography.titleLarge,
+        textAlign = TextAlign.Center,
+        color = colors.textPrimary
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
     Text(
         text = stringResource(R.string.verification_description),
-        style = MaterialTheme.typography.bodyLarge,
+        style = typography.bodyMedium,
         textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = colors.textSecondary
     )
 
     Spacer(modifier = Modifier.height(24.dp))
@@ -190,8 +231,24 @@ private fun VerificationStep(
     OutlinedTextField(
         value = code,
         onValueChange = onCodeChange,
-        label = { Text(stringResource(R.string.verification_code)) },
+        placeholder = {
+            Text(
+                text = stringResource(R.string.verification_code),
+                style = typography.bodyLarge,
+                color = colors.textSecondary
+            )
+        },
+        textStyle = typography.bodyLarge.copy(color = colors.textBody),
         singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = colors.surface,
+            unfocusedContainerColor = colors.surface,
+            disabledContainerColor = colors.surface,
+            unfocusedBorderColor = colors.divider,
+            focusedBorderColor = colors.accent,
+            cursorColor = colors.accent,
+        ),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Number,
             imeAction = ImeAction.Done
@@ -206,21 +263,36 @@ private fun VerificationStep(
     Button(
         onClick = onSubmit,
         enabled = code.isNotBlank() && !isLoading,
+        shape = RoundedCornerShape(AppShapes.pillRadius),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = colors.accent,
+            contentColor = Color.White,
+            disabledContainerColor = colors.accent.copy(alpha = 0.5f),
+            disabledContentColor = Color.White.copy(alpha = 0.5f),
+        ),
         modifier = Modifier.fillMaxWidth()
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                modifier = Modifier.height(20.dp),
-                strokeWidth = 2.dp
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = Color.White
             )
         } else {
-            Text(stringResource(R.string.verify))
+            Text(
+                text = stringResource(R.string.verify),
+                style = typography.bodyLarge,
+            )
         }
     }
 
     Spacer(modifier = Modifier.height(16.dp))
 
     TextButton(onClick = onBack, enabled = !isLoading) {
-        Text(stringResource(R.string.cancel))
+        Text(
+            text = stringResource(R.string.cancel),
+            style = typography.bodyMedium,
+            color = colors.accent
+        )
     }
 }

@@ -1,38 +1,30 @@
 package pub.hackers.android.ui.screens.explore
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import android.content.Intent
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import pub.hackers.android.ui.components.CompactTopBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -41,8 +33,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import pub.hackers.android.R
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
+import pub.hackers.android.ui.components.LargeTitleHeader
 import pub.hackers.android.ui.components.LoadingItem
 import pub.hackers.android.ui.components.PostCard
+import pub.hackers.android.ui.theme.LocalAppColors
+import pub.hackers.android.ui.theme.LocalAppTypography
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,26 +45,14 @@ fun ExploreScreen(
     onPostClick: (String) -> Unit,
     onProfileClick: (String) -> Unit,
     onReplyClick: (String) -> Unit,
-    onQuoteClick: (String) -> Unit = {},
-    onComposeClick: () -> Unit = {},
     onSignInClick: () -> Unit,
     isLoggedIn: Boolean,
     viewModel: ExploreViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshIfStale()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
 
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -91,26 +74,16 @@ fun ExploreScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            CompactTopBar(
-                title = stringResource(R.string.nav_explore),
-                actions = {
-                    if (!isLoggedIn) {
+            LargeTitleHeader(
+                title = "Explore",
+                trailingContent = if (!isLoggedIn) {
+                    {
                         TextButton(onClick = onSignInClick) {
                             Text(stringResource(R.string.sign_in))
                         }
                     }
-                }
+                } else null
             )
-        },
-        floatingActionButton = {
-            if (isLoggedIn) {
-                FloatingActionButton(onClick = onComposeClick) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = stringResource(R.string.compose)
-                    )
-                }
-            }
         }
     ) { paddingValues ->
         Column(
@@ -118,24 +91,48 @@ fun ExploreScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            PrimaryTabRow(
-                selectedTabIndex = uiState.selectedTab.ordinal
-            ) {
+            // Custom tab row
+            Row(modifier = Modifier.fillMaxWidth()) {
                 ExploreTab.entries.forEach { tab ->
-                    Tab(
-                        selected = uiState.selectedTab == tab,
-                        onClick = { viewModel.selectTab(tab) },
-                        text = {
-                            Text(
-                                when (tab) {
-                                    ExploreTab.LOCAL -> stringResource(R.string.local_timeline)
-                                    ExploreTab.GLOBAL -> stringResource(R.string.global_timeline)
-                                }
+                    val isSelected = uiState.selectedTab == tab
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.selectTab(tab) },
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = when (tab) {
+                                ExploreTab.LOCAL -> "Local"
+                                ExploreTab.GLOBAL -> "Global"
+                            },
+                            style = if (isSelected) typography.bodyLargeSemiBold else typography.bodyLarge,
+                            color = if (isSelected) colors.accent else colors.textSecondary,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(2.dp)
+                                    .background(colors.accent)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(2.dp)
                             )
                         }
-                    )
+                    }
                 }
             }
+
+            HorizontalDivider(
+                color = colors.divider,
+                thickness = 1.dp,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
 
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
@@ -181,25 +178,13 @@ fun ExploreScreen(
                                                 }
                                             }
                                         } else null,
-                                        onQuoteClick = if (isLoggedIn) {
-                                            { onQuoteClick(post.sharedPost?.id ?: post.id) }
-                                        } else null,
-                                        onReactionClick = { onPostClick(post.sharedPost?.id ?: post.id) },
-                                        onExternalShareClick = {
-                                            val displayPost = post.sharedPost ?: post
-                                            val shareUrl = displayPost.url ?: displayPost.iri
-                                            if (shareUrl != null) {
-                                                val sendIntent = Intent().apply {
-                                                    action = Intent.ACTION_SEND
-                                                    putExtra(Intent.EXTRA_TEXT, shareUrl)
-                                                    type = "text/plain"
-                                                }
-                                                context.startActivity(Intent.createChooser(sendIntent, null))
-                                            }
-                                        },
                                         onQuotedPostClick = onPostClick
                                     )
-                                    HorizontalDivider(thickness = 0.5.dp)
+                                    HorizontalDivider(
+                                        color = colors.divider,
+                                        thickness = 1.dp,
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
                                 }
 
                                 if (uiState.isLoadingMore) {

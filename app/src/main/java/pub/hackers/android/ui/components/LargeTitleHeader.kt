@@ -18,6 +18,7 @@ import pub.hackers.android.ui.theme.LocalAppTypography
 fun LargeTitleHeader(
     title: String,
     modifier: Modifier = Modifier,
+    leadingContent: @Composable (() -> Unit)? = null,
     trailingContent: @Composable (RowScope.() -> Unit)? = null,
 ) {
     val colors = LocalAppColors.current
@@ -26,13 +27,17 @@ fun LargeTitleHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = if (leadingContent != null) 4.dp else 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (leadingContent != null) {
+            leadingContent()
+        }
         Text(
             text = title,
             style = typography.titleLarge,
             color = colors.textPrimary,
+            modifier = if (leadingContent != null) Modifier.padding(start = 4.dp) else Modifier,
         )
         Spacer(modifier = Modifier.weight(1f))
         if (trailingContent != null) {
