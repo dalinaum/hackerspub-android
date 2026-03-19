@@ -22,6 +22,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -93,7 +94,14 @@ sealed class Screen(
 }
 
 sealed class DetailScreen(val route: String) {
-    data object SignIn : DetailScreen("signin")
+    data object SignIn : DetailScreen("signin?token={token}&code={code}") {
+        fun createRoute(token: String? = null, code: String? = null): String {
+            val params = mutableListOf<String>()
+            if (token != null) params.add("token=$token")
+            if (code != null) params.add("code=$code")
+            return if (params.isEmpty()) "signin" else "signin?${params.joinToString("&")}"
+        }
+    }
     data object Compose : DetailScreen("compose?replyTo={replyTo}&quoteOf={quoteOf}") {
         fun createRoute(replyTo: String? = null, quoteOf: String? = null): String {
             val params = mutableListOf<String>()
@@ -112,12 +120,20 @@ sealed class DetailScreen(val route: String) {
 
 @Composable
 fun HackersPubApp(
+    deepLinkData: pub.hackers.android.DeepLinkData? = null,
     viewModel: AppViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState(initial = false)
 
     val fontSizePercent by viewModel.preferencesManager.fontSizePercent.collectAsState(initial = 100)
+
+    // Handle deep link for verification
+    LaunchedEffect(deepLinkData) {
+        deepLinkData?.let {
+            navController.navigate("signin?token=${it.token}&code=${it.code}")
+        }
+    }
 
     ProvideInAppBrowserUriHandler(preferencesManager = viewModel.preferencesManager) {
     CompositionLocalProvider(LocalFontScale provides (fontSizePercent / 100f)) {
@@ -221,7 +237,7 @@ fun HackersPubApp(
                         navController.navigate(DetailScreen.Compose.createRoute())
                     },
                     onSignInClick = {
-                        navController.navigate(DetailScreen.SignIn.route)
+                        navController.navigate(DetailScreen.SignIn.createRoute())
                     },
                     isLoggedIn = isLoggedIn
                 )
@@ -247,7 +263,7 @@ fun HackersPubApp(
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onSignInClick = {
-                        navController.navigate(DetailScreen.SignIn.route)
+                        navController.navigate(DetailScreen.SignIn.createRoute())
                     },
                     onSignOutComplete = {
                         navController.navigate(Screen.Explore.route) {
@@ -261,8 +277,26 @@ fun HackersPubApp(
                 )
             }
 
-            composable(DetailScreen.SignIn.route) {
+            composable(
+                route = DetailScreen.SignIn.route,
+                arguments = listOf(
+                    navArgument("token") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("code") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { backStackEntry ->
+                val token = backStackEntry.arguments?.getString("token")
+                val code = backStackEntry.arguments?.getString("code")
                 SignInScreen(
+                    deepLinkToken = token,
+                    deepLinkCode = code,
                     onSignInSuccess = {
                         navController.navigate(Screen.Timeline.route) {
                             popUpTo(0) { inclusive = true }

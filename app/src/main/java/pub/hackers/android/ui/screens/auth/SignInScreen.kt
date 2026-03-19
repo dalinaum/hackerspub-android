@@ -42,6 +42,8 @@ import pub.hackers.android.R
 
 @Composable
 fun SignInScreen(
+    deepLinkToken: String? = null,
+    deepLinkCode: String? = null,
     onSignInSuccess: () -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: SignInViewModel = hiltViewModel()
@@ -49,6 +51,12 @@ fun SignInScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(deepLinkToken, deepLinkCode) {
+        if (deepLinkToken != null && deepLinkCode != null) {
+            viewModel.verifyWithDeepLink(deepLinkToken, deepLinkCode)
+        }
+    }
 
     LaunchedEffect(uiState.isSignedIn) {
         if (uiState.isSignedIn) {

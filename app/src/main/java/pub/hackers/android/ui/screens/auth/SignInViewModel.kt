@@ -108,6 +108,38 @@ class SignInViewModel @Inject constructor(
         }
     }
 
+    fun verifyWithDeepLink(token: String, code: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+
+            repository.completeLoginChallenge(token, code)
+                .onSuccess { session ->
+                    sessionManager.saveSession(
+                        token = session.id,
+                        userId = session.account.id,
+                        username = session.account.username,
+                        handle = session.account.handle,
+                        name = session.account.name,
+                        avatarUrl = session.account.avatarUrl
+                    )
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isSignedIn = true
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            error = error.message,
+                            isLoading = false
+                        )
+                    }
+                }
+        }
+    }
+
     fun goBackToUsername() {
         _uiState.update {
             it.copy(
