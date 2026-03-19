@@ -297,7 +297,7 @@ private fun EngagementBar(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(18.dp)
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         // Reply
         EngagementButton(
@@ -342,14 +342,13 @@ private fun EngagementBar(
         // External share — always textSecondary
         if (onExternalShareClick != null) {
             IconButton(
-                onClick = onExternalShareClick,
-                modifier = Modifier.size(32.dp)
+                onClick = onExternalShareClick
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Share,
                     contentDescription = stringResource(R.string.share),
                     tint = colors.textSecondary,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
@@ -374,14 +373,13 @@ private fun EngagementButton(
     ) {
         IconButton(
             onClick = { onClick?.invoke() },
-            enabled = onClick != null,
-            modifier = Modifier.size(32.dp)
+            enabled = onClick != null
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = tint,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
         if (count > 0) {
