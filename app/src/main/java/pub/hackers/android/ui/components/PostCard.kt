@@ -58,6 +58,7 @@ fun PostCard(
     onReactionClick: (() -> Unit)? = null,
     onExternalShareClick: (() -> Unit)? = null,
     onQuotedPostClick: ((String) -> Unit)? = null,
+    contentMaxLength: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val displayPost = post.sharedPost ?: post
@@ -153,14 +154,21 @@ fun PostCard(
                 )
             }
 
+            val truncatedContent = if (contentMaxLength > 0 && displayPost.content.length > contentMaxLength) {
+                displayPost.content.take(contentMaxLength)
+            } else {
+                displayPost.content
+            }
+            val isTruncated = contentMaxLength > 0 && displayPost.content.length > contentMaxLength
+
             HtmlContent(
-                html = displayPost.content,
-                maxLines = 10,
+                html = truncatedContent,
+                maxLines = if (contentMaxLength > 0) Int.MAX_VALUE else 10,
                 modifier = Modifier.fillMaxWidth(),
                 onMentionClick = onProfileClick
             )
 
-            if (displayPost.content.length > 500) {
+            if (isTruncated || (contentMaxLength == 0 && displayPost.content.length > 500)) {
                 Text(
                     text = stringResource(R.string.read_more),
                     style = MaterialTheme.typography.bodySmall,

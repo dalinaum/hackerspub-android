@@ -49,6 +49,7 @@ fun TimelineScreen(
     viewModel: TimelineViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val timelineMaxLength by viewModel.preferencesManager.timelineMaxLength.collectAsState(initial = 0)
     val listState = rememberLazyListState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -129,6 +130,7 @@ fun TimelineScreen(
                                     post = post,
                                     onClick = { onPostClick(post.sharedPost?.id ?: post.id) },
                                     onProfileClick = onProfileClick,
+                                    contentMaxLength = timelineMaxLength,
                                     onReplyClick = { onComposeClick(post.sharedPost?.id ?: post.id) },
                                     onShareClick = {
                                         if (post.viewerHasShared) {
