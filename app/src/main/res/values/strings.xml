@@ -36,6 +36,7 @@
     <string name="compose_edit">Edit</string>
     <string name="compose_preview">Preview</string>
     <string name="compose_preview_empty">Write something to see the preview</string>
+    <string name="quote_load_failed">Unable to load quoted post</string>
     <string name="visibility_public">Public</string>
     <string name="visibility_unlisted">Unlisted</string>
     <string name="visibility_followers">Followers only</string>

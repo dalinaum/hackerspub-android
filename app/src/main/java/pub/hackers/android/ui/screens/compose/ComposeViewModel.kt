@@ -35,6 +35,7 @@ data class ComposeUiState(
     val quotedPostId: String? = null,
     val quotedPost: Post? = null,
     val isLoadingQuotedPost: Boolean = false,
+    val quotedPostLoadFailed: Boolean = false,
     val isPosting: Boolean = false,
     val isPosted: Boolean = false,
     val error: String? = null,
@@ -187,7 +188,7 @@ class ComposeViewModel @Inject constructor(
     }
 
     fun setQuotedPost(postId: String) {
-        _uiState.update { it.copy(quotedPostId = postId, isLoadingQuotedPost = true) }
+        _uiState.update { it.copy(quotedPostId = postId, isLoadingQuotedPost = true, quotedPostLoadFailed = false) }
         viewModelScope.launch {
             repository.getPostDetail(postId)
                 .onSuccess { result ->
@@ -199,7 +200,7 @@ class ComposeViewModel @Inject constructor(
                     }
                 }
                 .onFailure {
-                    _uiState.update { it.copy(isLoadingQuotedPost = false) }
+                    _uiState.update { it.copy(isLoadingQuotedPost = false, quotedPostLoadFailed = true) }
                 }
         }
     }

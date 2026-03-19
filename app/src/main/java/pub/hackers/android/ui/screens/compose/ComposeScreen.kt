@@ -192,6 +192,9 @@ fun ComposeScreen(
             } else if (uiState.quotedPost != null) {
                 QuoteIndicator(isLoading = false, post = uiState.quotedPost)
                 Spacer(modifier = Modifier.height(12.dp))
+            } else if (uiState.quotedPostLoadFailed) {
+                QuoteIndicator(isLoading = false, failed = true)
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             // Edit/Preview toggle
@@ -422,7 +425,8 @@ fun ComposeScreen(
 @Composable
 private fun QuoteIndicator(
     isLoading: Boolean,
-    post: Post? = null
+    post: Post? = null,
+    failed: Boolean = false
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -454,6 +458,13 @@ private fun QuoteIndicator(
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
                     strokeWidth = 2.dp
+                )
+            } else if (failed) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.quote_load_failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
                 )
             } else if (post != null) {
                 Spacer(modifier = Modifier.height(8.dp))
