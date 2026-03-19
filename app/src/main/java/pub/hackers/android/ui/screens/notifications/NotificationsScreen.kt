@@ -283,7 +283,8 @@ private fun NotificationItem(
                 HtmlContent(
                     html = post.content,
                     maxLines = 3,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    onMentionClick = onProfileClick
                 )
             }
         }
