@@ -77,6 +77,7 @@ fun HackersPubTheme(
 
     CompositionLocalProvider(
         LocalAppColors provides appColors,
+        LocalAppTypography provides AppTypographyDefaults,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
