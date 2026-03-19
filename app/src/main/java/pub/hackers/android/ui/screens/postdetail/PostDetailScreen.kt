@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.ReplyAll
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Repeat
@@ -46,6 +47,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,6 +66,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -233,7 +236,7 @@ fun PostDetailScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             LargeTitleHeader(
-                title = if (uiState.post?.typename == "Article") "Article" else "Post",
+                title = if (uiState.post?.typename == "Article") stringResource(R.string.article) else "Post",
                 leadingContent = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -513,6 +516,23 @@ private fun PostDetailContent(
                         onClick = { onPostClick(post.quotedPost!!.id) },
                         onProfileClick = onProfileClick
                     )
+                }
+
+                if (post.typename == "Article" && post.url != null) {
+                    val uriHandler = LocalUriHandler.current
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { uriHandler.openUri(post.url) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.read_on_web))
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

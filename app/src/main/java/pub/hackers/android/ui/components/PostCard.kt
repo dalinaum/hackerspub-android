@@ -78,6 +78,46 @@ fun PostCard(
     modifier: Modifier = Modifier
 ) {
     val displayPost = post.sharedPost ?: post
+
+    if (displayPost.typename == "Article") {
+        ArticleCard(
+            post = post,
+            onClick = onClick,
+            onProfileClick = onProfileClick,
+            modifier = modifier
+        )
+    } else {
+        NoteCard(
+            post = post,
+            onClick = onClick,
+            onProfileClick = onProfileClick,
+            onReplyClick = onReplyClick,
+            onShareClick = onShareClick,
+            onQuoteClick = onQuoteClick,
+            onReactionClick = onReactionClick,
+            onExternalShareClick = onExternalShareClick,
+            onQuotedPostClick = onQuotedPostClick,
+            contentMaxLength = contentMaxLength,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+private fun NoteCard(
+    post: Post,
+    onClick: () -> Unit,
+    onProfileClick: (String) -> Unit,
+    onReplyClick: (() -> Unit)? = null,
+    onShareClick: (() -> Unit)? = null,
+    onQuoteClick: (() -> Unit)? = null,
+    onReactionClick: (() -> Unit)? = null,
+    onExternalShareClick: (() -> Unit)? = null,
+    onQuotedPostClick: ((String) -> Unit)? = null,
+    contentMaxLength: Int = 0,
+    modifier: Modifier = Modifier
+) {
+    val displayPost = post.sharedPost ?: post
     val isRepost = post.sharedPost != null
     val colors = LocalAppColors.current
     val typography = LocalAppTypography.current
@@ -609,7 +649,7 @@ private fun MediaImage(
     }
 }
 
-private fun formatRelativeTime(instant: Instant): String {
+internal fun formatRelativeTime(instant: Instant): String {
     val now = Instant.now()
     val duration = Duration.between(instant, now)
 

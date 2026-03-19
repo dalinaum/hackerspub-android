@@ -1,5 +1,8 @@
 package pub.hackers.android.ui.components
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
@@ -16,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import pub.hackers.android.ui.theme.LocalAppColors
 import pub.hackers.android.ui.theme.LocalAppTypography
 import java.net.URI
@@ -26,8 +31,19 @@ private enum class LinkType {
     MENTION, HASHTAG, REGULAR
 }
 
+private data class ListContext(val ordered: Boolean, var itemIndex: Int = 0)
+
+private sealed class ContentBlock {
+    data class Text(val html: String) : ContentBlock()
+    data class Code(val codeHtml: String) : ContentBlock()
+}
+
 private val TAG_REGEX = Regex("""<(/?)(\w+)([^>]*)>""")
 private val ATTR_REGEX = Regex("""([\w-]+)=["']([^"']*)["']""")
+private val PRE_CODE_REGEX = Regex(
+    """<pre[^>]*>\s*<code[^>]*>([\s\S]*?)</code>\s*</pre>""",
+    RegexOption.IGNORE_CASE
+)
 
 @Composable
 fun HtmlContent(
@@ -43,60 +59,130 @@ fun HtmlContent(
     val colors = LocalAppColors.current
     val linkColor = colors.accent
     val mentionBg = colors.accent.copy(alpha = 0.10f)
-    val codeBackground = colors.surface
+    val codeBg = colors.surface
     val textColor = colors.textBody
-
-    val annotatedString = remember(html, linkColor, mentionBg, codeBackground) {
-        parseHtmlToAnnotatedString(html, linkColor, mentionBg, codeBackground)
-    }
 
     val effectiveFontScale = if (fontScale != 1f) fontScale else LocalFontScale.current
     val baseStyle = LocalAppTypography.current.bodyLarge.copy(color = textColor)
-    val scaledStyle = if (effectiveFontScale != 1f) {
+    val bodyStyle = if (effectiveFontScale != 1f) {
         baseStyle.copy(fontSize = baseStyle.fontSize * effectiveFontScale)
     } else baseStyle
 
-    ClickableText(
-        text = annotatedString,
-        style = scaledStyle,
-        maxLines = maxLines,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier,
-        onClick = { offset ->
-            // Check mentions first
-            annotatedString.getStringAnnotations("MENTION", offset, offset)
-                .firstOrNull()?.let { annotation ->
-                    val handle = extractHandleFromUrl(annotation.item)
-                    if (handle != null && onMentionClick != null) {
-                        onMentionClick(handle)
-                    } else {
-                        try { uriHandler.openUri(annotation.item) } catch (_: Exception) {}
-                    }
-                    return@ClickableText
-                }
-
-            // Then regular links and hashtags
-            annotatedString.getStringAnnotations("URL", offset, offset)
-                .firstOrNull()?.let { annotation ->
-                    if (onLinkClick != null) {
-                        onLinkClick(annotation.item)
-                    } else {
-                        try { uriHandler.openUri(annotation.item) } catch (_: Exception) {}
-                    }
-                    return@ClickableText
-                }
-
-            // No link or mention tapped — propagate to parent
-            onTextClick?.invoke()
+    if (maxLines < Int.MAX_VALUE) {
+        // Preview mode: flat AnnotatedString (no block code highlighting)
+        val annotatedString = remember(html, linkColor, mentionBg, codeBg) {
+            parseHtmlToAnnotatedString(html, linkColor, mentionBg, codeBg)
         }
-    )
+
+        ClickableText(
+            text = annotatedString,
+            style = bodyStyle,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
+            modifier = modifier,
+            onClick = { offset ->
+                handleClick(annotatedString, offset, uriHandler, onMentionClick, onLinkClick, onTextClick)
+            }
+        )
+    } else {
+        // Full mode: block-based rendering with syntax-highlighted code blocks
+        val blocks = remember(html) { splitIntoBlocks(html) }
+
+        Column(modifier = modifier) {
+            blocks.forEachIndexed { index, block ->
+                when (block) {
+                    is ContentBlock.Text -> {
+                        if (block.html.isNotBlank()) {
+                            val annotatedString = remember(block.html, linkColor, mentionBg, codeBg) {
+                                parseHtmlToAnnotatedString(block.html, linkColor, mentionBg, codeBg)
+                            }
+                            if (annotatedString.isNotEmpty()) {
+                                ClickableText(
+                                    text = annotatedString,
+                                    style = bodyStyle,
+                                    onClick = { offset ->
+                                        handleClick(annotatedString, offset, uriHandler, onMentionClick, onLinkClick, onTextClick)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    is ContentBlock.Code -> {
+                        if (index > 0) Spacer(modifier = Modifier.height(8.dp))
+                        CodeBlockView(
+                            codeHtml = block.codeHtml
+                        )
+                        if (index < blocks.lastIndex) Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            }
+        }
+    }
 }
 
-/**
- * Extracts a fediverse handle from a mention URL.
- * e.g. "https://hackers.pub/@user" -> "user@hackers.pub"
- *      "https://mastodon.social/@user" -> "user@mastodon.social"
- */
+private fun handleClick(
+    annotatedString: AnnotatedString,
+    offset: Int,
+    uriHandler: androidx.compose.ui.platform.UriHandler,
+    onMentionClick: ((String) -> Unit)?,
+    onLinkClick: ((String) -> Unit)?,
+    onTextClick: (() -> Unit)? = null
+) {
+    annotatedString.getStringAnnotations("MENTION", offset, offset)
+        .firstOrNull()?.let { annotation ->
+            val handle = extractHandleFromUrl(annotation.item)
+            if (handle != null && onMentionClick != null) {
+                onMentionClick(handle)
+            } else {
+                try { uriHandler.openUri(annotation.item) } catch (_: Exception) {}
+            }
+            return
+        }
+
+    annotatedString.getStringAnnotations("URL", offset, offset)
+        .firstOrNull()?.let { annotation ->
+            if (onLinkClick != null) {
+                onLinkClick(annotation.item)
+            } else {
+                try { uriHandler.openUri(annotation.item) } catch (_: Exception) {}
+            }
+            return
+        }
+
+    // No link or mention tapped — propagate to parent
+    onTextClick?.invoke()
+}
+
+private fun splitIntoBlocks(html: String): List<ContentBlock> {
+    val blocks = mutableListOf<ContentBlock>()
+    var lastEnd = 0
+    val source = html.trim()
+
+    for (match in PRE_CODE_REGEX.findAll(source)) {
+        val before = source.substring(lastEnd, match.range.first)
+        if (before.isNotBlank()) {
+            blocks.add(ContentBlock.Text(before))
+        }
+
+        val codeHtml = match.groupValues[1]
+        blocks.add(ContentBlock.Code(codeHtml))
+
+        lastEnd = match.range.last + 1
+    }
+
+    val after = source.substring(lastEnd)
+    if (after.isNotBlank()) {
+        blocks.add(ContentBlock.Text(after))
+    }
+
+    // If no code blocks found, return the whole thing as text
+    if (blocks.isEmpty()) {
+        blocks.add(ContentBlock.Text(source))
+    }
+
+    return blocks
+}
+
 private fun extractHandleFromUrl(url: String): String? {
     return try {
         val uri = URI(url)
@@ -113,56 +199,56 @@ private fun parseHtmlToAnnotatedString(
     html: String,
     linkColor: Color,
     mentionBg: Color,
-    codeBackground: Color
+    codeBg: Color
 ): AnnotatedString {
     return buildAnnotatedString {
+        // Link state
         var currentLinkType: LinkType? = null
         var hasAnnotation = false
+
+        // Invisible span state
         var insideInvisibleSpan = false
         var invisibleSpanDepth = 0
-        var hasContent = false
-        var isBold = false
-        var isItalic = false
-        var isStrikethrough = false
-        var isCode = false
-        var isPreformatted = false
-        var listDepth = 0
-        var orderedListCounter = 0
-        var isInList = false
-        var isBlockquote = false
 
+        // Inline style depths (for push/pop tracking)
+        var boldDepth = 0
+        var italicDepth = 0
+        var codeDepth = 0
+        var strikeDepth = 0
+
+        // Block state
+        var preDepth = 0
+        var headingLevel = 0
+        var blockquoteDepth = 0
+
+        // List state
+        val listStack = mutableListOf<ListContext>()
+        var insideListItem = false
+
+        var hasContent = false
         var pos = 0
         val source = html.trim()
 
         while (pos < source.length) {
             val tagMatch = TAG_REGEX.find(source, pos)
 
-            // Handle text before the next tag (or remaining text if no more tags)
+            // Text before the next tag (or remaining text)
             if (tagMatch == null || tagMatch.range.first > pos) {
                 val textEnd = tagMatch?.range?.first ?: source.length
                 val rawText = source.substring(pos, textEnd)
                 val decoded = decodeHtmlEntities(rawText)
 
                 if (!insideInvisibleSpan && decoded.isNotEmpty()) {
-                    val isInterBlockWhitespace = decoded.isBlank() && decoded.contains('\n')
-                    if (!isInterBlockWhitespace) {
-                        val styledText = decoded
-                        val inlineStyle = SpanStyle(
-                            fontWeight = if (isBold) FontWeight.Bold else null,
-                            fontStyle = if (isItalic) FontStyle.Italic else null,
-                            textDecoration = if (isStrikethrough) TextDecoration.LineThrough else null,
-                            fontFamily = if (isCode || isPreformatted) FontFamily.Monospace else null,
-                            background = if (isCode && !isPreformatted) codeBackground else Color.Unspecified
-                        )
-
-                        if (isBold || isItalic || isStrikethrough || isCode || isPreformatted) {
-                            withStyle(inlineStyle) {
-                                appendStyledText(this, styledText, currentLinkType, linkColor, mentionBg)
-                            }
-                        } else {
-                            appendStyledText(this, styledText, currentLinkType, linkColor, mentionBg)
-                        }
+                    if (preDepth > 0) {
+                        // Preserve all whitespace in preformatted blocks
+                        appendStyledText(this, decoded, currentLinkType, linkColor, mentionBg)
                         hasContent = true
+                    } else {
+                        val isInterBlockWhitespace = decoded.isBlank() && decoded.contains('\n')
+                        if (!isInterBlockWhitespace) {
+                            appendStyledText(this, decoded, currentLinkType, linkColor, mentionBg)
+                            hasContent = true
+                        }
                     }
                 }
 
@@ -178,62 +264,116 @@ private fun parseHtmlToAnnotatedString(
                     val attrs = parseAttributes(attrString)
 
                     when (tagName) {
+                        // Block elements
                         "p" -> {
                             if (hasContent) append("\n\n")
                         }
                         "br" -> {
                             append("\n")
                         }
+
+                        // Headings
+                        "h1", "h2", "h3", "h4", "h5", "h6" -> {
+                            headingLevel = tagName[1].digitToInt()
+                            if (hasContent) append("\n\n")
+                            val fontSize = when (headingLevel) {
+                                1 -> 1.5.em
+                                2 -> 1.3.em
+                                3 -> 1.15.em
+                                else -> 1.0.em
+                            }
+                            pushStyle(SpanStyle(
+                                fontSize = fontSize,
+                                fontWeight = FontWeight.Bold
+                            ))
+                        }
+
+                        // Preformatted / code blocks
+                        "pre" -> {
+                            if (hasContent) append("\n\n")
+                            preDepth++
+                            pushStyle(SpanStyle(
+                                fontFamily = FontFamily.Monospace,
+                                background = codeBg,
+                                fontSize = 0.875.em
+                            ))
+                        }
+
+                        // Inline code
+                        "code" -> {
+                            codeDepth++
+                            if (preDepth == 0) {
+                                // Only style inline <code>, not <pre><code>
+                                pushStyle(SpanStyle(
+                                    fontFamily = FontFamily.Monospace,
+                                    background = codeBg,
+                                    fontSize = 0.875.em
+                                ))
+                            }
+                        }
+
+                        // Bold
                         "strong", "b" -> {
-                            isBold = true
+                            boldDepth++
+                            pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
                         }
+
+                        // Italic
                         "em", "i" -> {
-                            isItalic = true
+                            italicDepth++
+                            pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
                         }
-                        "del", "s", "strike" -> {
-                            isStrikethrough = true
+
+                        // Strikethrough
+                        "del", "s" -> {
+                            strikeDepth++
+                            pushStyle(SpanStyle(textDecoration = TextDecoration.LineThrough))
                         }
+
+                        // Horizontal rule
                         "hr" -> {
                             if (hasContent) append("\n")
-                            append("──────────")
+                            append("\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")
                             append("\n")
                             hasContent = true
                         }
-                        "code" -> {
-                            isCode = true
-                        }
-                        "pre" -> {
-                            if (hasContent) append("\n\n")
-                            isPreformatted = true
-                        }
+
+                        // Blockquote
                         "blockquote" -> {
                             if (hasContent) append("\n\n")
-                            isBlockquote = true
-                            append("  \u2502 ")
+                            blockquoteDepth++
+                            pushStyle(SpanStyle(
+                                fontStyle = FontStyle.Italic,
+                                color = Color(0xFF6B7280)
+                            ))
                         }
+
+                        // Lists
                         "ul" -> {
-                            if (hasContent && listDepth == 0) append("\n")
-                            listDepth++
-                            isInList = true
+                            if (hasContent && listStack.isEmpty()) append("\n")
+                            listStack.add(ListContext(ordered = false))
                         }
                         "ol" -> {
-                            if (hasContent && listDepth == 0) append("\n")
-                            listDepth++
-                            orderedListCounter = 0
-                            isInList = true
+                            if (hasContent && listStack.isEmpty()) append("\n")
+                            listStack.add(ListContext(ordered = true))
                         }
                         "li" -> {
-                            if (hasContent) append("\n")
-                            val indent = "  ".repeat(listDepth)
-                            if (orderedListCounter > 0 || tagName == "li") {
-                                // Check parent — simple heuristic: if orderedListCounter was reset, it's unordered
+                            if (insideListItem) append("\n")
+                            val ctx = listStack.lastOrNull()
+                            val indent = "  ".repeat((listStack.size - 1).coerceAtLeast(0))
+                            if (ctx != null) {
+                                if (ctx.ordered) {
+                                    ctx.itemIndex++
+                                    append("${indent}${ctx.itemIndex}. ")
+                                } else {
+                                    append("${indent}\u2022 ")
+                                }
                             }
-                            append("${indent}\u2022 ")
+                            insideListItem = true
+                            hasContent = true
                         }
-                        "h1", "h2", "h3", "h4", "h5", "h6" -> {
-                            if (hasContent) append("\n\n")
-                            isBold = true
-                        }
+
+                        // Links
                         "a" -> {
                             val classes = attrs["class"] ?: ""
                             val href = attrs["href"] ?: ""
@@ -251,6 +391,8 @@ private fun parseHtmlToAnnotatedString(
                                 hasAnnotation = true
                             }
                         }
+
+                        // Invisible spans
                         "span" -> {
                             val classes = attrs["class"] ?: ""
                             if ("invisible" in classes) {
@@ -260,37 +402,74 @@ private fun parseHtmlToAnnotatedString(
                         }
                     }
                 } else {
+                    // Closing tags
                     when (tagName) {
-                        "strong", "b" -> {
-                            isBold = false
-                        }
-                        "em", "i" -> {
-                            isItalic = false
-                        }
-                        "del", "s", "strike" -> {
-                            isStrikethrough = false
-                        }
-                        "code" -> {
-                            isCode = false
-                        }
-                        "pre" -> {
-                            isPreformatted = false
-                            append("\n")
-                        }
-                        "blockquote" -> {
-                            isBlockquote = false
-                        }
-                        "ul", "ol" -> {
-                            listDepth = maxOf(0, listDepth - 1)
-                            if (listDepth == 0) {
-                                isInList = false
-                                orderedListCounter = 0
+                        "h1", "h2", "h3", "h4", "h5", "h6" -> {
+                            if (headingLevel > 0) {
+                                pop()
+                                headingLevel = 0
                             }
                         }
-                        "h1", "h2", "h3", "h4", "h5", "h6" -> {
-                            isBold = false
-                            append("\n")
+
+                        "pre" -> {
+                            if (preDepth > 0) {
+                                preDepth--
+                                pop()
+                            }
                         }
+
+                        "code" -> {
+                            if (codeDepth > 0) {
+                                codeDepth--
+                                if (preDepth == 0) {
+                                    // Only pop if we pushed for inline code
+                                    pop()
+                                }
+                            }
+                        }
+
+                        "strong", "b" -> {
+                            if (boldDepth > 0) {
+                                boldDepth--
+                                pop()
+                            }
+                        }
+
+                        "em", "i" -> {
+                            if (italicDepth > 0) {
+                                italicDepth--
+                                pop()
+                            }
+                        }
+
+                        "del", "s" -> {
+                            if (strikeDepth > 0) {
+                                strikeDepth--
+                                pop()
+                            }
+                        }
+
+                        "blockquote" -> {
+                            if (blockquoteDepth > 0) {
+                                blockquoteDepth--
+                                pop()
+                            }
+                        }
+
+                        "ul", "ol" -> {
+                            if (listStack.isNotEmpty()) {
+                                listStack.removeLast()
+                            }
+                            insideListItem = false
+                            if (listStack.isEmpty() && hasContent) {
+                                append("\n")
+                            }
+                        }
+
+                        "li" -> {
+                            // Keep insideListItem = true so next <li> adds a newline
+                        }
+
                         "a" -> {
                             if (hasAnnotation) {
                                 pop()
@@ -298,6 +477,7 @@ private fun parseHtmlToAnnotatedString(
                             }
                             currentLinkType = null
                         }
+
                         "span" -> {
                             if (insideInvisibleSpan) {
                                 invisibleSpanDepth--
