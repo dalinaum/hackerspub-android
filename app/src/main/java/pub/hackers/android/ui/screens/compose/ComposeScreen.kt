@@ -27,6 +27,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -72,6 +74,7 @@ import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.PostVisibility
 import pub.hackers.android.ui.components.HtmlContent
 import pub.hackers.android.ui.components.MentionAutocomplete
+import pub.hackers.android.ui.components.markdownToHtml
 import kotlin.math.roundToInt
 
 @Composable
@@ -85,6 +88,7 @@ fun ComposeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showVisibilityMenu by remember { mutableStateOf(false) }
+    var showPreview by remember { mutableStateOf(false) }
 
     // Track TextFieldValue for cursor position
     var textFieldValue by remember {
@@ -190,8 +194,63 @@ fun ComposeScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
+            // Edit/Preview toggle
+            TabRow(
+                selectedTabIndex = if (showPreview) 1 else 0
+            ) {
+                Tab(
+                    selected = !showPreview,
+                    onClick = { showPreview = false },
+                    text = { Text(stringResource(R.string.compose_edit)) }
+                )
+                Tab(
+                    selected = showPreview,
+                    onClick = { showPreview = true },
+                    text = { Text(stringResource(R.string.compose_preview)) }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             Box(modifier = Modifier.weight(1f)) {
-                // Custom text field with cursor position tracking
+                if (showPreview) {
+                    // Preview mode
+                    if (textFieldValue.text.isBlank()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = stringResource(R.string.compose_preview_empty),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        val previewHtml = remember(textFieldValue.text) {
+                            markdownToHtml(textFieldValue.text)
+                        }
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                HtmlContent(
+                                    html = previewHtml,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+                } else {
+                // Edit mode - Custom text field with cursor position tracking
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
@@ -282,6 +341,7 @@ fun ComposeScreen(
                         )
                     }
                 }
+                } // end else (edit mode)
             }
 
             Spacer(modifier = Modifier.height(16.dp))

@@ -33,6 +33,9 @@
     <string name="compose_hint">What\'s on your mind?</string>
     <string name="post">Post</string>
     <string name="cancel">Cancel</string>
+    <string name="compose_edit">Edit</string>
+    <string name="compose_preview">Preview</string>
+    <string name="compose_preview_empty">Write something to see the preview</string>
     <string name="visibility_public">Public</string>
     <string name="visibility_unlisted">Unlisted</string>
     <string name="visibility_followers">Followers only</string>
