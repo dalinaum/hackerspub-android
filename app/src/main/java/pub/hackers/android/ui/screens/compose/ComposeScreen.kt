@@ -49,6 +49,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -103,6 +104,7 @@ fun ComposeScreen(
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val scrollState = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
     val density = LocalDensity.current
     val popupHeight = with(density) { 200.dp.toPx() } // Estimated popup height
 
@@ -216,7 +218,10 @@ fun ComposeScreen(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
-                            ) { focusRequester.requestFocus() }
+                            ) {
+                                focusRequester.requestFocus()
+                                keyboardController?.show()
+                            }
                             .padding(16.dp)
                             .verticalScroll(scrollState)
                     ) {
