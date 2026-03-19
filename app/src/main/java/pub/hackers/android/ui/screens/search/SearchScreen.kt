@@ -27,11 +27,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.content.Intent
 import pub.hackers.android.R
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
@@ -45,10 +47,13 @@ import pub.hackers.android.ui.theme.LocalAppTypography
 fun SearchScreen(
     onPostClick: (String) -> Unit,
     onProfileClick: (String) -> Unit,
+    onReplyClick: (String) -> Unit = {},
+    onQuoteClick: (String) -> Unit = {},
     viewModel: SearchViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
+    val context = LocalContext.current
     val colors = LocalAppColors.current
     val typography = LocalAppTypography.current
 
@@ -144,6 +149,21 @@ fun SearchScreen(
                                     post = post,
                                     onClick = { onPostClick(post.sharedPost?.id ?: post.id) },
                                     onProfileClick = onProfileClick,
+                                    onReplyClick = { onReplyClick(post.sharedPost?.id ?: post.id) },
+                                    onQuoteClick = { onQuoteClick(post.sharedPost?.id ?: post.id) },
+                                    onReactionClick = { onPostClick(post.sharedPost?.id ?: post.id) },
+                                    onExternalShareClick = {
+                                        val displayPost = post.sharedPost ?: post
+                                        val shareUrl = displayPost.url ?: displayPost.iri
+                                        if (shareUrl != null) {
+                                            val sendIntent = Intent().apply {
+                                                action = Intent.ACTION_SEND
+                                                putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                                type = "text/plain"
+                                            }
+                                            context.startActivity(Intent.createChooser(sendIntent, null))
+                                        }
+                                    },
                                     onQuotedPostClick = onPostClick
                                 )
                                 HorizontalDivider(

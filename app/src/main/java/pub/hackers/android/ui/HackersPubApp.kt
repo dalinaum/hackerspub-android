@@ -221,6 +221,9 @@ fun HackersPubApp(
                     onComposeClick = { replyTo ->
                         navController.navigate(DetailScreen.Compose.createRoute(replyTo))
                     },
+                    onQuoteClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
+                    },
                     onSettingsClick = {
                         navController.navigate(Screen.Settings.route)
                     }
@@ -249,6 +252,9 @@ fun HackersPubApp(
                     onReplyClick = { postId ->
                         navController.navigate(DetailScreen.Compose.createRoute(postId))
                     },
+                    onQuoteClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
+                    },
                     onSignInClick = {
                         navController.navigate(DetailScreen.SignIn.createRoute())
                     },
@@ -263,6 +269,12 @@ fun HackersPubApp(
                     },
                     onProfileClick = { handle ->
                         navController.navigate(DetailScreen.Profile.createRoute(handle))
+                    },
+                    onReplyClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(replyTo = postId))
+                    },
+                    onQuoteClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
                     }
                 )
             }

@@ -36,10 +36,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.content.Intent
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -131,6 +133,8 @@ fun PostDetailScreen(
                         replies = uiState.replies,
                         onProfileClick = onProfileClick,
                         onPostClick = onPostClick,
+                        onReplyClick = onReplyClick,
+                        onQuoteClick = onQuoteClick,
                         onShareClick = {
                             if (uiState.post!!.viewerHasShared) {
                                 viewModel.unsharePost()
@@ -152,8 +156,11 @@ private fun PostDetailContent(
     replies: List<Post>,
     onProfileClick: (String) -> Unit,
     onPostClick: (String) -> Unit,
+    onReplyClick: (String) -> Unit,
+    onQuoteClick: (String) -> Unit,
     onShareClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val colors = LocalAppColors.current
     val typography = LocalAppTypography.current
     val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a")
@@ -371,6 +378,20 @@ private fun PostDetailContent(
                     post = reply,
                     onClick = { onPostClick(reply.id) },
                     onProfileClick = onProfileClick,
+                    onReplyClick = { onReplyClick(reply.id) },
+                    onQuoteClick = { onQuoteClick(reply.id) },
+                    onReactionClick = { onPostClick(reply.id) },
+                    onExternalShareClick = {
+                        val shareUrl = reply.url ?: reply.iri
+                        if (shareUrl != null) {
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                type = "text/plain"
+                            }
+                            context.startActivity(Intent.createChooser(sendIntent, null))
+                        }
+                    },
                     onQuotedPostClick = onPostClick
                 )
                 HorizontalDivider(thickness = 0.5.dp, color = colors.divider)
