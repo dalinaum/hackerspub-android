@@ -1,0 +1,40 @@
+Categories:
+  - Internet
+License: AGPL-3.0-only
+AuthorName: Hackers' Pub
+SourceCode: https://github.com/hackers-pub/android
+IssueTracker: https://github.com/hackers-pub/android/issues
+
+Summary: A client for Hackers' Pub, a federated community for software engineers
+
+Description: |-
+  Hackers' Pub is a federated community platform for software engineers,
+  built on ActivityPub. This Android client lets you browse timelines,
+  interact with posts, explore content, and participate in the fediverse
+  from your mobile device.
+
+  Features include:
+  * Browse your home timeline
+  * Explore trending posts and topics
+  * View and interact with posts
+  * Search for content and users
+  * Compose and publish posts
+  * View user profiles
+  * Receive notifications
+
+RepoType: git
+Repo: https://github.com/hackers-pub/android.git
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: v1.0.0
+    subdir: app
+    gradle:
+      - yes
+    ndk: r27c
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1
