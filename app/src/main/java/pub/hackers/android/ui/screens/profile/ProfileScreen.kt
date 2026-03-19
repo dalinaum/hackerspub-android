@@ -166,7 +166,8 @@ fun ProfileScreen(
                                     viewerBlocks = uiState.viewerBlocks,
                                     isPerformingAction = uiState.isPerformingAction,
                                     onFollowClick = { viewModel.followActor() },
-                                    onUnfollowClick = { viewModel.unfollowActor() }
+                                    onUnfollowClick = { viewModel.unfollowActor() },
+                                    onMentionClick = onProfileClick
                                 )
                                 HorizontalDivider()
                             }
@@ -282,7 +283,8 @@ private fun ProfileHeader(
     viewerBlocks: Boolean,
     isPerformingAction: Boolean,
     onFollowClick: () -> Unit,
-    onUnfollowClick: () -> Unit
+    onUnfollowClick: () -> Unit,
+    onMentionClick: (String) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -373,7 +375,8 @@ private fun ProfileHeader(
             Spacer(modifier = Modifier.height(12.dp))
             HtmlContent(
                 html = bio,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                onMentionClick = onMentionClick
             )
         }
     }
