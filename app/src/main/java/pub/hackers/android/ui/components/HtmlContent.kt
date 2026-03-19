@@ -1,12 +1,11 @@
 package pub.hackers.android.ui.components
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.ClickableText
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,7 +21,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import pub.hackers.android.ui.theme.LocalAppColors
+import pub.hackers.android.ui.theme.LocalAppTypography
 import java.net.URI
+
+val LocalFontScale = compositionLocalOf { 1f }
 
 private enum class LinkType {
     MENTION, HASHTAG, REGULAR
@@ -47,16 +50,23 @@ fun HtmlContent(
     html: String,
     maxLines: Int = Int.MAX_VALUE,
     modifier: Modifier = Modifier,
+    fontScale: Float = 1f,
     onMentionClick: ((handle: String) -> Unit)? = null,
-    onLinkClick: ((url: String) -> Unit)? = null
+    onLinkClick: ((url: String) -> Unit)? = null,
+    onTextClick: (() -> Unit)? = null
 ) {
     val uriHandler = LocalUriHandler.current
-    val isDark = isSystemInDarkTheme()
-    val linkColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB)
-    val mentionBg = linkColor.copy(alpha = 0.10f)
-    val codeBg = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
-    val textColor = MaterialTheme.colorScheme.onSurface
-    val bodyStyle = MaterialTheme.typography.bodyMedium.copy(color = textColor)
+    val colors = LocalAppColors.current
+    val linkColor = colors.accent
+    val mentionBg = colors.accent.copy(alpha = 0.10f)
+    val codeBg = colors.surface
+    val textColor = colors.textBody
+
+    val effectiveFontScale = if (fontScale != 1f) fontScale else LocalFontScale.current
+    val baseStyle = LocalAppTypography.current.bodyLarge.copy(color = textColor)
+    val bodyStyle = if (effectiveFontScale != 1f) {
+        baseStyle.copy(fontSize = baseStyle.fontSize * effectiveFontScale)
+    } else baseStyle
 
     if (maxLines < Int.MAX_VALUE) {
         // Preview mode: flat AnnotatedString (no block code highlighting)
@@ -71,7 +81,7 @@ fun HtmlContent(
             overflow = TextOverflow.Ellipsis,
             modifier = modifier,
             onClick = { offset ->
-                handleClick(annotatedString, offset, uriHandler, onMentionClick, onLinkClick)
+                handleClick(annotatedString, offset, uriHandler, onMentionClick, onLinkClick, onTextClick)
             }
         )
     } else {
@@ -91,7 +101,7 @@ fun HtmlContent(
                                     text = annotatedString,
                                     style = bodyStyle,
                                     onClick = { offset ->
-                                        handleClick(annotatedString, offset, uriHandler, onMentionClick, onLinkClick)
+                                        handleClick(annotatedString, offset, uriHandler, onMentionClick, onLinkClick, onTextClick)
                                     }
                                 )
                             }
@@ -115,7 +125,8 @@ private fun handleClick(
     offset: Int,
     uriHandler: androidx.compose.ui.platform.UriHandler,
     onMentionClick: ((String) -> Unit)?,
-    onLinkClick: ((String) -> Unit)?
+    onLinkClick: ((String) -> Unit)?,
+    onTextClick: (() -> Unit)? = null
 ) {
     annotatedString.getStringAnnotations("MENTION", offset, offset)
         .firstOrNull()?.let { annotation ->
@@ -135,7 +146,11 @@ private fun handleClick(
             } else {
                 try { uriHandler.openUri(annotation.item) } catch (_: Exception) {}
             }
+            return
         }
+
+    // No link or mention tapped — propagate to parent
+    onTextClick?.invoke()
 }
 
 private fun splitIntoBlocks(html: String): List<ContentBlock> {
@@ -313,6 +328,14 @@ private fun parseHtmlToAnnotatedString(
                         "del", "s" -> {
                             strikeDepth++
                             pushStyle(SpanStyle(textDecoration = TextDecoration.LineThrough))
+                        }
+
+                        // Horizontal rule
+                        "hr" -> {
+                            if (hasContent) append("\n")
+                            append("\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")
+                            append("\n")
+                            hasContent = true
                         }
 
                         // Blockquote

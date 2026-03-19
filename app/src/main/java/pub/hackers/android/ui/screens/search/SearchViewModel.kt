@@ -8,25 +8,39 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import pub.hackers.android.data.local.PreferencesManager
 import pub.hackers.android.data.repository.HackersPubRepository
+import pub.hackers.android.domain.model.Actor
 import pub.hackers.android.domain.model.Post
 import javax.inject.Inject
 
 data class SearchUiState(
     val query: String = "",
+    val actors: List<Actor> = emptyList(),
     val posts: List<Post> = emptyList(),
     val isLoading: Boolean = false,
     val hasSearched: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val resolvedObjectUrl: String? = null,
+    val recentSearches: List<String> = emptyList()
 )
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
-    private val repository: HackersPubRepository
+    private val repository: HackersPubRepository,
+    private val preferencesManager: PreferencesManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            preferencesManager.recentSearches.collect { searches ->
+                _uiState.update { it.copy(recentSearches = searches) }
+            }
+        }
+    }
 
     fun updateQuery(query: String) {
         _uiState.update { it.copy(query = query) }
@@ -37,13 +51,39 @@ class SearchViewModel @Inject constructor(
         if (query.isEmpty()) return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true) }
+            _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true, resolvedObjectUrl = null, actors = emptyList()) }
 
+            // Save to recent searches
+            preferencesManager.addRecentSearch(query)
+
+            // Try searchObject first for URL/handle resolution
+            repository.searchObject(query)
+                .onSuccess { url ->
+                    if (url != null) {
+                        _uiState.update { it.copy(resolvedObjectUrl = url) }
+                    }
+                }
+
+            // Search actors if query looks like a handle
+            if (query.startsWith("@") || query.contains("@")) {
+                val handleQuery = query.removePrefix("@")
+                repository.searchActorsByHandle(handleQuery, limit = 5)
+                    .onSuccess { actors ->
+                        _uiState.update { it.copy(actors = actors) }
+                    }
+            }
+
+            // Always search posts too
             repository.searchPosts(query)
                 .onSuccess { posts ->
+                    // Deduplicate: remove actors whose IDs appear in post authors
+                    val postActorIds = posts.map { it.actor.id }.toSet()
+                    val dedupedActors = _uiState.value.actors.filter { it.id !in postActorIds }
+
                     _uiState.update {
                         it.copy(
                             posts = posts,
+                            actors = dedupedActors,
                             isLoading = false
                         )
                     }
@@ -59,9 +99,30 @@ class SearchViewModel @Inject constructor(
         }
     }
 
+    fun consumeResolvedUrl() {
+        _uiState.update { it.copy(resolvedObjectUrl = null) }
+    }
+
     fun clearSearch() {
         _uiState.update {
-            SearchUiState()
+            SearchUiState(recentSearches = it.recentSearches)
         }
+    }
+
+    fun removeRecentSearch(query: String) {
+        viewModelScope.launch {
+            preferencesManager.removeRecentSearch(query)
+        }
+    }
+
+    fun clearRecentSearches() {
+        viewModelScope.launch {
+            preferencesManager.clearRecentSearches()
+        }
+    }
+
+    fun selectRecentSearch(query: String) {
+        _uiState.update { it.copy(query = query) }
+        search()
     }
 }

@@ -33,6 +33,7 @@ data class Post(
     val content: String,
     val excerpt: String,
     val url: String?,
+    val iri: String? = null,
     val viewerHasShared: Boolean,
     val actor: Actor,
     val media: List<Media>,
@@ -41,7 +42,8 @@ data class Post(
     val sharedPost: Post? = null,
     val replyTarget: Post? = null,
     val quotedPost: Post? = null,
-    val visibility: PostVisibility = PostVisibility.PUBLIC
+    val visibility: PostVisibility = PostVisibility.PUBLIC,
+    val reactionGroups: List<ReactionGroup> = emptyList()
 )
 
 enum class PostVisibility {
@@ -114,7 +116,8 @@ data class ReactionGroup(
     val emoji: String?,
     val customEmoji: CustomEmoji?,
     val count: Int,
-    val reactors: List<Actor>
+    val reactors: List<Actor>,
+    val viewerHasReacted: Boolean = false
 )
 
 data class Viewer(
@@ -163,10 +166,26 @@ data class PostDetailResult(
     val repliesEndCursor: String?
 )
 
+data class SharesResult(
+    val actors: List<Actor>,
+    val hasNextPage: Boolean,
+    val endCursor: String?
+)
+
+data class QuotesResult(
+    val posts: List<Post>,
+    val hasNextPage: Boolean,
+    val endCursor: String?
+)
+
 data class ProfileResult(
     val actor: Actor,
     val bio: String?,
     val posts: List<Post>,
     val hasNextPage: Boolean,
-    val endCursor: String?
+    val endCursor: String?,
+    val isViewer: Boolean = false,
+    val viewerFollows: Boolean = false,
+    val followsViewer: Boolean = false,
+    val viewerBlocks: Boolean = false
 )

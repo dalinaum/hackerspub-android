@@ -19,14 +19,14 @@ import androidx.compose.material.icons.filled.Login
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import pub.hackers.android.ui.components.CompactTopBar
+import pub.hackers.android.ui.components.LargeTitleHeader
+import pub.hackers.android.ui.theme.LocalAppColors
+import pub.hackers.android.ui.theme.LocalAppTypography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -54,6 +54,8 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showSignOutDialog by remember { mutableStateOf(false) }
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
 
     LaunchedEffect(uiState.isSignedOut) {
         if (uiState.isSignedOut) {
@@ -80,12 +82,18 @@ fun SettingsScreen(
                         viewModel.signOut()
                     }
                 ) {
-                    Text(stringResource(R.string.sign_out))
+                    Text(
+                        stringResource(R.string.sign_out),
+                        color = colors.accent
+                    )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutDialog = false }) {
-                    Text(stringResource(R.string.cancel))
+                    Text(
+                        stringResource(R.string.cancel),
+                        color = colors.accent
+                    )
                 }
             }
         )
@@ -94,7 +102,7 @@ fun SettingsScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            CompactTopBar(title = stringResource(R.string.settings))
+            LargeTitleHeader(title = stringResource(R.string.settings))
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
@@ -122,68 +130,110 @@ fun SettingsScreen(
                     Column {
                         Text(
                             text = uiState.userName ?: "",
-                            style = MaterialTheme.typography.titleMedium
+                            style = typography.titleMedium,
+                            color = colors.textPrimary
                         )
                         Text(
                             text = "@${uiState.userHandle ?: ""}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = typography.bodyMedium,
+                            color = colors.textSecondary
                         )
                     }
                 }
-                HorizontalDivider()
+                HorizontalDivider(color = colors.divider, thickness = 1.dp)
             }
 
             if (isLoggedIn) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.sign_out)) },
-                    leadingContent = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Logout,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    },
-                    modifier = Modifier.clickable { showSignOutDialog = true }
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showSignOutDialog = true }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Logout,
+                        contentDescription = null,
+                        tint = colors.reaction
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = stringResource(R.string.sign_out),
+                        style = typography.bodyLarge,
+                        color = colors.textPrimary
+                    )
+                }
             } else {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.sign_in)) },
-                    leadingContent = {
-                        Icon(
-                            imageVector = Icons.Filled.Login,
-                            contentDescription = null
-                        )
-                    },
-                    modifier = Modifier.clickable(onClick = onSignInClick)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onSignInClick)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Login,
+                        contentDescription = null,
+                        tint = colors.textSecondary
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = stringResource(R.string.sign_in),
+                        style = typography.bodyLarge,
+                        color = colors.textPrimary
+                    )
+                }
+            }
+
+            HorizontalDivider(color = colors.divider, thickness = 1.dp)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { viewModel.clearCache() }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = null,
+                    tint = colors.textSecondary
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = stringResource(R.string.clear_cache),
+                    style = typography.bodyLarge,
+                    color = colors.textPrimary
                 )
             }
 
-            HorizontalDivider()
+            HorizontalDivider(color = colors.divider, thickness = 1.dp)
 
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.clear_cache)) },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = null
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Info,
+                    contentDescription = null,
+                    tint = colors.textSecondary
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = stringResource(R.string.about),
+                        style = typography.bodyLarge,
+                        color = colors.textPrimary
                     )
-                },
-                modifier = Modifier.clickable { viewModel.clearCache() }
-            )
-
-            HorizontalDivider()
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.about)) },
-                supportingContent = { Text("${stringResource(R.string.version)} 1.0.0") },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Filled.Info,
-                        contentDescription = null
+                    Text(
+                        text = "${stringResource(R.string.version)} 1.0.0",
+                        style = typography.bodyMedium,
+                        color = colors.textSecondary
                     )
                 }
-            )
+            }
         }
     }
 }

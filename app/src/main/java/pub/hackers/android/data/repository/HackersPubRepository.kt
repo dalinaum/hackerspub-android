@@ -5,7 +5,32 @@ import com.apollographql.apollo.api.Optional
 import com.apollographql.apollo.cache.normalized.FetchPolicy
 import com.apollographql.apollo.cache.normalized.fetchPolicy
 import pub.hackers.android.domain.model.*
-import pub.hackers.android.graphql.*
+import pub.hackers.android.graphql.ActorByHandleQuery
+import pub.hackers.android.graphql.AddReactionToPostMutation
+import pub.hackers.android.graphql.BlockActorMutation
+import pub.hackers.android.graphql.CompleteLoginChallengeMutation
+import pub.hackers.android.graphql.CreateNoteMutation
+import pub.hackers.android.graphql.DeletePostMutation
+import pub.hackers.android.graphql.FollowActorMutation
+import pub.hackers.android.graphql.LocalTimelineQuery
+import pub.hackers.android.graphql.LoginByUsernameMutation
+import pub.hackers.android.graphql.NotificationsQuery
+import pub.hackers.android.graphql.PersonalTimelineQuery
+import pub.hackers.android.graphql.PostQuotesQuery
+import pub.hackers.android.graphql.PostSharesQuery
+import pub.hackers.android.graphql.PostDetailQuery
+import pub.hackers.android.graphql.PublicTimelineQuery
+import pub.hackers.android.graphql.RemoveFollowerMutation
+import pub.hackers.android.graphql.RemoveReactionFromPostMutation
+import pub.hackers.android.graphql.RevokeSessionMutation
+import pub.hackers.android.graphql.SearchActorsByHandleQuery
+import pub.hackers.android.graphql.SearchObjectQuery
+import pub.hackers.android.graphql.SearchPostQuery
+import pub.hackers.android.graphql.SharePostMutation
+import pub.hackers.android.graphql.UnblockActorMutation
+import pub.hackers.android.graphql.UnfollowActorMutation
+import pub.hackers.android.graphql.UnsharePostMutation
+import pub.hackers.android.graphql.ViewerQuery
 import pub.hackers.android.graphql.fragment.ActorFields
 import pub.hackers.android.graphql.fragment.EngagementStatsFields
 import pub.hackers.android.graphql.fragment.MediaFields
@@ -163,7 +188,8 @@ class HackersPubRepository @Inject constructor(
                             count = group.onEmojiReactionGroup.reactors.totalCount,
                             reactors = group.onEmojiReactionGroup.reactors.edges.map {
                                 it.node.actorFields.toActor()
-                            }
+                            },
+                            viewerHasReacted = group.onEmojiReactionGroup.reactors.viewerHasReacted
                         )
                         group.onCustomEmojiReactionGroup != null -> ReactionGroup(
                             emoji = null,
@@ -175,7 +201,8 @@ class HackersPubRepository @Inject constructor(
                             count = group.onCustomEmojiReactionGroup.reactors.totalCount,
                             reactors = group.onCustomEmojiReactionGroup.reactors.edges.map {
                                 it.node.actorFields.toActor()
-                            }
+                            },
+                            viewerHasReacted = group.onCustomEmojiReactionGroup.reactors.viewerHasReacted
                         )
                         else -> null
                     }
@@ -225,7 +252,11 @@ class HackersPubRepository @Inject constructor(
                             edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
                         },
                         hasNextPage = actor.posts.pageInfo.hasNextPage,
-                        endCursor = actor.posts.pageInfo.endCursor
+                        endCursor = actor.posts.pageInfo.endCursor,
+                        isViewer = actor.isViewer,
+                        viewerFollows = actor.viewerFollows,
+                        followsViewer = actor.followsViewer,
+                        viewerBlocks = actor.viewerBlocks
                     )
                 )
             }
@@ -325,7 +356,8 @@ class HackersPubRepository @Inject constructor(
         content: String,
         language: String = "en",
         visibility: PostVisibility = PostVisibility.PUBLIC,
-        replyTargetId: String? = null
+        replyTargetId: String? = null,
+        quotedPostId: String? = null
     ): Result<Post> {
         return try {
             val gqlVisibility = when (visibility) {
@@ -341,7 +373,8 @@ class HackersPubRepository @Inject constructor(
                     content = content,
                     language = language,
                     visibility = gqlVisibility,
-                    replyTargetId = Optional.presentIfNotNull(replyTargetId)
+                    replyTargetId = Optional.presentIfNotNull(replyTargetId),
+                    quotedPostId = Optional.presentIfNotNull(quotedPostId)
                 )
             ).execute()
 
@@ -470,6 +503,248 @@ class HackersPubRepository @Inject constructor(
         }
     }
 
+    suspend fun followActor(actorId: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(FollowActorMutation(actorId)).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val result = response.data?.followActor
+                when {
+                    result?.onFollowActorPayload != null -> Result.success(Unit)
+                    result?.onInvalidInputError != null ->
+                        Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+                    result?.onNotAuthenticatedError != null ->
+                        Result.failure(Exception("Not authenticated"))
+                    else -> Result.failure(Exception("Unknown error"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun unfollowActor(actorId: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(UnfollowActorMutation(actorId)).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val result = response.data?.unfollowActor
+                when {
+                    result?.onUnfollowActorPayload != null -> Result.success(Unit)
+                    result?.onInvalidInputError != null ->
+                        Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+                    result?.onNotAuthenticatedError != null ->
+                        Result.failure(Exception("Not authenticated"))
+                    else -> Result.failure(Exception("Unknown error"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun blockActor(actorId: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(BlockActorMutation(actorId)).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val result = response.data?.blockActor
+                when {
+                    result?.onBlockActorPayload != null -> Result.success(Unit)
+                    result?.onInvalidInputError != null ->
+                        Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+                    result?.onNotAuthenticatedError != null ->
+                        Result.failure(Exception("Not authenticated"))
+                    else -> Result.failure(Exception("Unknown error"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun unblockActor(actorId: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(UnblockActorMutation(actorId)).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val result = response.data?.unblockActor
+                when {
+                    result?.onUnblockActorPayload != null -> Result.success(Unit)
+                    result?.onInvalidInputError != null ->
+                        Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+                    result?.onNotAuthenticatedError != null ->
+                        Result.failure(Exception("Not authenticated"))
+                    else -> Result.failure(Exception("Unknown error"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun removeFollower(actorId: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(RemoveFollowerMutation(actorId)).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val result = response.data?.removeFollower
+                when {
+                    result?.onRemoveFollowerPayload != null -> Result.success(Unit)
+                    result?.onInvalidInputError != null ->
+                        Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+                    result?.onNotAuthenticatedError != null ->
+                        Result.failure(Exception("Not authenticated"))
+                    else -> Result.failure(Exception("Unknown error"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun searchObject(query: String): Result<String?> {
+        return try {
+            val response = apolloClient.query(SearchObjectQuery(query)).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val url = response.data?.searchObject?.onSearchedObject?.url
+                Result.success(url)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPostShares(postId: String, after: String? = null): Result<SharesResult> {
+        return try {
+            val response = apolloClient.query(
+                PostSharesQuery(postId, Optional.presentIfNotNull(after))
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val shares = response.data?.node?.onPost?.shares
+                    ?: return Result.failure(Exception("Post not found"))
+
+                Result.success(
+                    SharesResult(
+                        actors = shares.edges.map { edge ->
+                            edge.node.actor.actorFields.toActor()
+                        },
+                        hasNextPage = shares.pageInfo.hasNextPage,
+                        endCursor = shares.pageInfo.endCursor
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPostQuotes(postId: String, after: String? = null): Result<QuotesResult> {
+        return try {
+            val response = apolloClient.query(
+                PostQuotesQuery(postId, Optional.presentIfNotNull(after))
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val quotes = response.data?.node?.onPost?.quotes
+                    ?: return Result.failure(Exception("Post not found"))
+
+                Result.success(
+                    QuotesResult(
+                        posts = quotes.edges.mapNotNull { edge ->
+                            edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
+                        },
+                        hasNextPage = quotes.pageInfo.hasNextPage,
+                        endCursor = quotes.pageInfo.endCursor
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun addReactionToPost(postId: String, emoji: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(
+                AddReactionToPostMutation(postId = postId, emoji = emoji)
+            ).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val result = response.data?.addReactionToPost
+                when {
+                    result?.onAddReactionToPostPayload != null -> Result.success(Unit)
+                    result?.onInvalidInputError != null ->
+                        Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+                    result?.onNotAuthenticatedError != null ->
+                        Result.failure(Exception("Not authenticated"))
+                    else -> Result.failure(Exception("Unknown error"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun removeReactionFromPost(postId: String, emoji: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(
+                RemoveReactionFromPostMutation(postId = postId, emoji = emoji)
+            ).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val result = response.data?.removeReactionFromPost
+                when {
+                    result?.onRemoveReactionFromPostPayload != null -> Result.success(Unit)
+                    result?.onInvalidInputError != null ->
+                        Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+                    result?.onNotAuthenticatedError != null ->
+                        Result.failure(Exception("Not authenticated"))
+                    else -> Result.failure(Exception("Unknown error"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deletePost(postId: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(DeletePostMutation(postId)).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val result = response.data?.deletePost
+                when {
+                    result?.onDeletePostPayload != null -> Result.success(Unit)
+                    result?.onInvalidInputError != null ->
+                        Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+                    result?.onNotAuthenticatedError != null ->
+                        Result.failure(Exception("Not authenticated"))
+                    result?.onSharedPostDeletionNotAllowedError != null ->
+                        Result.failure(Exception("Cannot delete a shared post"))
+                    else -> Result.failure(Exception("Unknown error"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     // Extension functions to convert GraphQL fragment types to domain models
     private fun PostFields.toPost(
         sharedPost: Post? = null,
@@ -485,6 +760,7 @@ class HackersPubRepository @Inject constructor(
             content = content.toString(),
             excerpt = excerpt,
             url = url?.toString(),
+            iri = iri?.toString(),
             viewerHasShared = viewerHasShared,
             actor = actor.actorFields.toActor(),
             media = media.map { it.mediaFields.toMedia() },
@@ -493,7 +769,30 @@ class HackersPubRepository @Inject constructor(
             sharedPost = sharedPost,
             replyTarget = replyTarget,
             quotedPost = quotedPost?.sharedPostFields?.toPost(),
-            visibility = visibility
+            visibility = visibility,
+            reactionGroups = reactionGroups.mapNotNull { group ->
+                when {
+                    group.onEmojiReactionGroup != null -> ReactionGroup(
+                        emoji = group.onEmojiReactionGroup.emoji,
+                        customEmoji = null,
+                        count = group.onEmojiReactionGroup.reactors.totalCount,
+                        reactors = emptyList(),
+                        viewerHasReacted = group.onEmojiReactionGroup.reactors.viewerHasReacted
+                    )
+                    group.onCustomEmojiReactionGroup != null -> ReactionGroup(
+                        emoji = null,
+                        customEmoji = CustomEmoji(
+                            id = group.onCustomEmojiReactionGroup.customEmoji.id,
+                            name = group.onCustomEmojiReactionGroup.customEmoji.name,
+                            imageUrl = group.onCustomEmojiReactionGroup.customEmoji.imageUrl
+                        ),
+                        count = group.onCustomEmojiReactionGroup.reactors.totalCount,
+                        reactors = emptyList(),
+                        viewerHasReacted = group.onCustomEmojiReactionGroup.reactors.viewerHasReacted
+                    )
+                    else -> null
+                }
+            }
         )
     }
 
@@ -507,6 +806,7 @@ class HackersPubRepository @Inject constructor(
             content = content.toString(),
             excerpt = excerpt,
             url = url?.toString(),
+            iri = iri?.toString(),
             viewerHasShared = viewerHasShared,
             actor = actor.actorFields.toActor(),
             media = media.map { it.mediaFields.toMedia() },

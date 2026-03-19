@@ -7,9 +7,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import pub.hackers.android.data.local.PreferencesManager
+import pub.hackers.android.data.local.SessionManager
 import pub.hackers.android.data.repository.HackersPubRepository
+import pub.hackers.android.domain.model.Actor
 import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.ReactionGroup
 import javax.inject.Inject
@@ -19,12 +23,30 @@ data class PostDetailUiState(
     val reactionGroups: List<ReactionGroup> = emptyList(),
     val replies: List<Post> = emptyList(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val isRefreshing: Boolean = false,
+    val isLoadingMoreReplies: Boolean = false,
+    val hasMoreReplies: Boolean = false,
+    val repliesEndCursor: String? = null,
+    val error: String? = null,
+    val canDelete: Boolean = false,
+    val isDeleting: Boolean = false,
+    val deleteError: String? = null,
+    val isDeleted: Boolean = false,
+    val isReacting: Boolean = false,
+    val showReactionPicker: Boolean = false,
+    val showSharesSheet: Boolean = false,
+    val shareActors: List<Actor> = emptyList(),
+    val isLoadingShares: Boolean = false,
+    val showQuotesSheet: Boolean = false,
+    val quotePosts: List<Post> = emptyList(),
+    val isLoadingQuotes: Boolean = false
 )
 
 @HiltViewModel
 class PostDetailViewModel @Inject constructor(
     private val repository: HackersPubRepository,
+    private val sessionManager: SessionManager,
+    val preferencesManager: PreferencesManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -43,12 +65,20 @@ class PostDetailViewModel @Inject constructor(
 
             repository.getPostDetail(id)
                 .onSuccess { result ->
+                    val viewerHandle = sessionManager.userHandle.first()
+                    val canDelete = viewerHandle != null &&
+                        result.post.actor.handle.equals(viewerHandle, ignoreCase = true) &&
+                        result.post.sharedPost == null
+
                     _uiState.update {
                         it.copy(
                             post = result.post,
                             reactionGroups = result.reactionGroups,
                             replies = result.replies,
-                            isLoading = false
+                            hasMoreReplies = result.hasMoreReplies,
+                            repliesEndCursor = result.repliesEndCursor,
+                            isLoading = false,
+                            canDelete = canDelete
                         )
                     }
                 }
@@ -59,6 +89,59 @@ class PostDetailViewModel @Inject constructor(
                             isLoading = false
                         )
                     }
+                }
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true) }
+
+            repository.getPostDetail(postId)
+                .onSuccess { result ->
+                    val viewerHandle = sessionManager.userHandle.first()
+                    val canDelete = viewerHandle != null &&
+                        result.post.actor.handle.equals(viewerHandle, ignoreCase = true) &&
+                        result.post.sharedPost == null
+
+                    _uiState.update {
+                        it.copy(
+                            post = result.post,
+                            reactionGroups = result.reactionGroups,
+                            replies = result.replies,
+                            hasMoreReplies = result.hasMoreReplies,
+                            repliesEndCursor = result.repliesEndCursor,
+                            isRefreshing = false,
+                            canDelete = canDelete
+                        )
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isRefreshing = false) }
+                }
+        }
+    }
+
+    fun loadMoreReplies() {
+        val state = _uiState.value
+        if (!state.hasMoreReplies || state.isLoadingMoreReplies) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMoreReplies = true) }
+
+            repository.getPostDetail(postId, repliesAfter = state.repliesEndCursor)
+                .onSuccess { result ->
+                    _uiState.update {
+                        it.copy(
+                            replies = it.replies + result.replies,
+                            hasMoreReplies = result.hasMoreReplies,
+                            repliesEndCursor = result.repliesEndCursor,
+                            isLoadingMoreReplies = false
+                        )
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isLoadingMoreReplies = false) }
                 }
         }
     }
@@ -99,6 +182,139 @@ class PostDetailViewModel @Inject constructor(
                             )
                         } ?: state
                     }
+                }
+        }
+    }
+
+    fun deletePost() {
+        if (_uiState.value.isDeleting) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDeleting = true, deleteError = null) }
+
+            repository.deletePost(postId)
+                .onSuccess {
+                    _uiState.update { it.copy(isDeleting = false, isDeleted = true) }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(isDeleting = false, deleteError = error.message)
+                    }
+                }
+        }
+    }
+
+    fun dismissDeleteError() {
+        _uiState.update { it.copy(deleteError = null) }
+    }
+
+    fun toggleReactionPicker() {
+        _uiState.update { it.copy(showReactionPicker = !it.showReactionPicker) }
+    }
+
+    fun showSharesSheet() {
+        _uiState.update { it.copy(showSharesSheet = true, isLoadingShares = true) }
+        viewModelScope.launch {
+            repository.getPostShares(postId)
+                .onSuccess { result ->
+                    _uiState.update {
+                        it.copy(shareActors = result.actors, isLoadingShares = false)
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isLoadingShares = false) }
+                }
+        }
+    }
+
+    fun dismissSharesSheet() {
+        _uiState.update { it.copy(showSharesSheet = false) }
+    }
+
+    fun showQuotesSheet() {
+        _uiState.update { it.copy(showQuotesSheet = true, isLoadingQuotes = true) }
+        viewModelScope.launch {
+            repository.getPostQuotes(postId)
+                .onSuccess { result ->
+                    _uiState.update {
+                        it.copy(quotePosts = result.posts, isLoadingQuotes = false)
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isLoadingQuotes = false) }
+                }
+        }
+    }
+
+    fun dismissQuotesSheet() {
+        _uiState.update { it.copy(showQuotesSheet = false) }
+    }
+
+    fun toggleReaction(emoji: String) {
+        if (_uiState.value.isReacting) return
+
+        val existingGroup = _uiState.value.reactionGroups.find { it.emoji == emoji }
+        val viewerHasReacted = existingGroup?.viewerHasReacted == true
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isReacting = true) }
+
+            val result = if (viewerHasReacted) {
+                repository.removeReactionFromPost(postId, emoji)
+            } else {
+                repository.addReactionToPost(postId, emoji)
+            }
+
+            result
+                .onSuccess {
+                    // Optimistically update local state
+                    _uiState.update { state ->
+                        val updatedGroups = if (viewerHasReacted) {
+                            state.reactionGroups.map { group ->
+                                if (group.emoji == emoji) {
+                                    group.copy(
+                                        count = maxOf(0, group.count - 1),
+                                        viewerHasReacted = false
+                                    )
+                                } else group
+                            }.filter { it.count > 0 || it.viewerHasReacted }
+                        } else {
+                            val existing = state.reactionGroups.find { it.emoji == emoji }
+                            if (existing != null) {
+                                state.reactionGroups.map { group ->
+                                    if (group.emoji == emoji) {
+                                        group.copy(
+                                            count = group.count + 1,
+                                            viewerHasReacted = true
+                                        )
+                                    } else group
+                                }
+                            } else {
+                                state.reactionGroups + ReactionGroup(
+                                    emoji = emoji,
+                                    customEmoji = null,
+                                    count = 1,
+                                    reactors = emptyList(),
+                                    viewerHasReacted = true
+                                )
+                            }
+                        }
+
+                        val totalReactions = updatedGroups.sumOf { it.count }
+
+                        state.copy(
+                            reactionGroups = updatedGroups,
+                            isReacting = false,
+                            post = state.post?.copy(
+                                engagementStats = state.post.engagementStats.copy(
+                                    reactions = totalReactions
+                                )
+                            )
+                        )
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isReacting = false) }
                 }
         }
     }

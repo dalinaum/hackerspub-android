@@ -17,7 +17,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,11 +25,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import pub.hackers.android.R
 import pub.hackers.android.domain.model.Post
+import pub.hackers.android.ui.theme.AppShapes
+import pub.hackers.android.ui.theme.LocalAppColors
+import pub.hackers.android.ui.theme.LocalAppTypography
 
 @Composable
 fun ArticleCard(
@@ -41,13 +44,15 @@ fun ArticleCard(
 ) {
     val displayPost = post.sharedPost ?: post
     val isRepost = post.sharedPost != null
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = colors.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -63,14 +68,14 @@ fun ArticleCard(
                         Icon(
                             imageVector = Icons.Filled.Repeat,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
+                            tint = colors.textSecondary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "${post.actor.name ?: post.actor.handle} ${stringResource(R.string.share)}d",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            style = typography.caption,
+                            color = colors.textSecondary
                         )
                     }
                 }
@@ -83,7 +88,7 @@ fun ArticleCard(
                         model = displayPost.actor.avatarUrl,
                         contentDescription = "Avatar",
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(AppShapes.avatarTimeline)
                             .clip(CircleShape)
                             .clickable { onProfileClick(displayPost.actor.handle) },
                         contentScale = ContentScale.Crop
@@ -97,8 +102,8 @@ fun ArticleCard(
                         ) {
                             Text(
                                 text = displayPost.actor.name ?: displayPost.actor.handle,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
+                                style = typography.bodyLargeSemiBold,
+                                color = colors.textPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
@@ -108,15 +113,15 @@ fun ArticleCard(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = formatRelativeTime(displayPost.published),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = typography.labelMedium,
+                                color = colors.textSecondary
                             )
                         }
 
                         Text(
                             text = "@${displayPost.actor.handle}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = typography.labelMedium,
+                            color = colors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -129,8 +134,9 @@ fun ArticleCard(
                 displayPost.name?.let { title ->
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -143,8 +149,8 @@ fun ArticleCard(
                 if (summaryText.isNotBlank()) {
                     Text(
                         text = summaryText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = typography.bodyMedium,
+                        color = colors.textSecondary,
                         maxLines = 4,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -152,16 +158,16 @@ fun ArticleCard(
             }
 
             // "Read full article" footer
-            HorizontalDivider()
+            HorizontalDivider(color = colors.divider)
             Text(
                 text = stringResource(R.string.read_full_article),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = typography.bodyMedium,
+                color = colors.textSecondary,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .background(colors.surface.copy(alpha = 0.5f))
                     .padding(vertical = 12.dp, horizontal = 16.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center
             )
         }
     }

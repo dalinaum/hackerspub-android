@@ -12,19 +12,30 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import android.icu.util.ULocale
+import android.os.Build
+import android.view.textclassifier.TextClassificationManager
+import android.view.textclassifier.TextLanguage
 import pub.hackers.android.data.repository.HackersPubRepository
 import pub.hackers.android.domain.model.Actor
 import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.PostVisibility
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import javax.inject.Inject
 
 data class ComposeUiState(
     val content: String = "",
     val cursorPosition: Int = 0,
+    val language: String = java.util.Locale.getDefault().language,
     val visibility: PostVisibility = PostVisibility.PUBLIC,
     val replyToId: String? = null,
     val replyTargetPost: Post? = null,
     val isLoadingReplyTarget: Boolean = false,
+    val quotedPostId: String? = null,
+    val quotedPost: Post? = null,
+    val isLoadingQuotedPost: Boolean = false,
+    val quotedPostLoadFailed: Boolean = false,
     val isPosting: Boolean = false,
     val isPosted: Boolean = false,
     val error: String? = null,
@@ -38,7 +49,8 @@ data class ComposeUiState(
 @OptIn(FlowPreview::class)
 @HiltViewModel
 class ComposeViewModel @Inject constructor(
-    private val repository: HackersPubRepository
+    private val repository: HackersPubRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ComposeUiState())
@@ -150,7 +162,8 @@ class ComposeViewModel @Inject constructor(
                 " " // Add space after mention if at end
             }
 
-            val insertedHandle = "@${actor.handle} "
+            val normalizedHandle = actor.handle.removePrefix("@")
+            val insertedHandle = "@$normalizedHandle "
             val newContent = "$beforeMention$insertedHandle${afterMention.trimStart()}"
             val newCursorPosition = beforeMention.length + insertedHandle.length
 
@@ -173,6 +186,24 @@ class ComposeViewModel @Inject constructor(
 
     fun dismissMentionSuggestions() {
         clearMentionState()
+    }
+
+    fun setQuotedPost(postId: String) {
+        _uiState.update { it.copy(quotedPostId = postId, isLoadingQuotedPost = true, quotedPostLoadFailed = false) }
+        viewModelScope.launch {
+            repository.getPostDetail(postId)
+                .onSuccess { result ->
+                    _uiState.update {
+                        it.copy(
+                            quotedPost = result.post,
+                            isLoadingQuotedPost = false
+                        )
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isLoadingQuotedPost = false, quotedPostLoadFailed = true) }
+                }
+        }
     }
 
     fun setReplyTarget(postId: String) {
@@ -199,17 +230,17 @@ class ComposeViewModel @Inject constructor(
     private fun buildMentionPrefix(post: Post): String {
         val mentions = mutableSetOf<String>()
 
-        // Add the post author
-        mentions.add(post.actor.handle)
+        // Add the post author (normalize by removing leading @)
+        mentions.add(post.actor.handle.removePrefix("@"))
 
-        // Add existing mentions from the post
-        mentions.addAll(post.mentions)
+        // Add existing mentions from the post (normalize)
+        mentions.addAll(post.mentions.map { it.removePrefix("@") })
 
-        // Remove viewer's own handle if present
-        viewerHandle?.let { mentions.remove(it) }
+        // Remove viewer's own handle if present (normalize for comparison)
+        viewerHandle?.let { mentions.remove(it.removePrefix("@")) }
 
         return if (mentions.isNotEmpty()) {
-            mentions.joinToString(" ") { "@$it" } + " "
+            mentions.joinToString(" ") { "@${it.removePrefix("@")}" } + " "
         } else {
             ""
         }
@@ -220,6 +251,31 @@ class ComposeViewModel @Inject constructor(
 
         // Check for mention trigger
         detectMentionTrigger(content, cursorPosition)
+
+        // Detect language
+        detectLanguage(content)
+    }
+
+    private fun detectLanguage(text: String) {
+        if (text.isBlank() || text.length < 20) return
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val tcm = context.getSystemService(Context.TEXT_CLASSIFICATION_SERVICE) as? TextClassificationManager
+                val classifier = tcm?.textClassifier ?: return
+                val request = TextLanguage.Request.Builder(text).build()
+                val result = classifier.detectLanguage(request)
+                if (result.localeHypothesisCount > 0) {
+                    val topLocale = result.getLocale(0)
+                    val lang = topLocale.language
+                    if (lang.isNotEmpty()) {
+                        _uiState.update { it.copy(language = lang) }
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // Fallback: keep current language
+        }
     }
 
     fun updateVisibility(visibility: PostVisibility) {
@@ -235,8 +291,10 @@ class ComposeViewModel @Inject constructor(
 
             repository.createNote(
                 content = state.content,
+                language = state.language,
                 visibility = state.visibility,
-                replyTargetId = state.replyToId
+                replyTargetId = state.replyToId,
+                quotedPostId = state.quotedPostId
             )
                 .onSuccess {
                     _uiState.update { it.copy(isPosting = false, isPosted = true) }

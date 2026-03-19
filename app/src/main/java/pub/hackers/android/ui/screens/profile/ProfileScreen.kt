@@ -1,7 +1,12 @@
 package pub.hackers.android.ui.screens.profile
 
+import android.content.Intent
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,43 +14,61 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import pub.hackers.android.ui.components.CompactTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import pub.hackers.android.R
+import pub.hackers.android.ui.components.LargeTitleHeader
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
 import pub.hackers.android.ui.components.LoadingItem
 import pub.hackers.android.ui.components.PostCard
+import pub.hackers.android.ui.theme.AppShapes
+import pub.hackers.android.ui.theme.LocalAppColors
+import pub.hackers.android.ui.theme.LocalAppTypography
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,10 +76,15 @@ fun ProfileScreen(
     handle: String,
     onNavigateBack: () -> Unit,
     onPostClick: (String) -> Unit,
+    onProfileClick: (String) -> Unit = {},
+    onReplyClick: (String) -> Unit = {},
+    onQuoteClick: (String) -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+    val colors = LocalAppColors.current
 
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -71,16 +99,61 @@ fun ProfileScreen(
         }
     }
 
+    if (uiState.actionError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissActionError() },
+            title = { Text(stringResource(R.string.action_error)) },
+            text = { Text(uiState.actionError ?: "") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissActionError() }) {
+                    Text(stringResource(R.string.ok))
+                }
+            }
+        )
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            CompactTopBar(
-                title = uiState.actor?.name ?: handle,
-                navigationIcon = {
+            LargeTitleHeader(
+                title = "",
+                leadingContent = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            tint = colors.accent
+                        )
+                    }
+                },
+                trailingContent = {
+                    if (uiState.actor != null) {
+                        IconButton(onClick = {
+                            val profileHandle = uiState.actor!!.handle
+                            val normalizedHandle = if (profileHandle.startsWith("@")) profileHandle else "@$profileHandle"
+                            val profileUrl = "https://hackers.pub/$normalizedHandle"
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, profileUrl)
+                                type = "text/plain"
+                            }
+                            context.startActivity(Intent.createChooser(sendIntent, null))
+                        }) {
+                            Icon(
+                                imageVector = Icons.Outlined.Share,
+                                contentDescription = stringResource(R.string.share),
+                                tint = colors.accent
+                            )
+                        }
+                    }
+                    if (!uiState.isViewer && uiState.actor != null) {
+                        ProfileActionMenu(
+                            followsViewer = uiState.followsViewer,
+                            viewerBlocks = uiState.viewerBlocks,
+                            isPerformingAction = uiState.isPerformingAction,
+                            onRemoveFollower = { viewModel.removeFollower() },
+                            onBlock = { viewModel.blockActor() },
+                            onUnblock = { viewModel.unblockActor() }
                         )
                     }
                 }
@@ -113,9 +186,21 @@ fun ProfileScreen(
                                     avatarUrl = uiState.actor!!.avatarUrl,
                                     name = uiState.actor!!.name,
                                     handle = uiState.actor!!.handle,
-                                    bio = uiState.bio
+                                    bio = uiState.bio,
+                                    isViewer = uiState.isViewer,
+                                    viewerFollows = uiState.viewerFollows,
+                                    followsViewer = uiState.followsViewer,
+                                    viewerBlocks = uiState.viewerBlocks,
+                                    isPerformingAction = uiState.isPerformingAction,
+                                    onFollowClick = { viewModel.followActor() },
+                                    onUnfollowClick = { viewModel.unfollowActor() },
+                                    onMentionClick = onProfileClick
                                 )
-                                HorizontalDivider()
+                                HorizontalDivider(
+                                    color = LocalAppColors.current.divider,
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
                             }
 
                             items(
@@ -125,10 +210,37 @@ fun ProfileScreen(
                                 PostCard(
                                     post = post,
                                     onClick = { onPostClick(post.sharedPost?.id ?: post.id) },
-                                    onProfileClick = {},
+                                    onProfileClick = onProfileClick,
+                                    onReplyClick = { onReplyClick(post.sharedPost?.id ?: post.id) },
+                                    onShareClick = {
+                                        val targetId = post.sharedPost?.id ?: post.id
+                                        if (post.viewerHasShared) {
+                                            viewModel.unsharePost(targetId)
+                                        } else {
+                                            viewModel.sharePost(targetId)
+                                        }
+                                    },
+                                    onQuoteClick = { onQuoteClick(post.sharedPost?.id ?: post.id) },
+                                    onReactionClick = { onPostClick(post.sharedPost?.id ?: post.id) },
+                                    onExternalShareClick = {
+                                        val displayPost = post.sharedPost ?: post
+                                        val shareUrl = displayPost.url ?: displayPost.iri
+                                        if (shareUrl != null) {
+                                            val sendIntent = Intent().apply {
+                                                action = Intent.ACTION_SEND
+                                                putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                                type = "text/plain"
+                                            }
+                                            context.startActivity(Intent.createChooser(sendIntent, null))
+                                        }
+                                    },
                                     onQuotedPostClick = onPostClick
                                 )
-                                HorizontalDivider(thickness = 0.5.dp)
+                                HorizontalDivider(
+                                    color = LocalAppColors.current.divider,
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
                             }
 
                             if (uiState.isLoadingMore) {
@@ -145,12 +257,81 @@ fun ProfileScreen(
 }
 
 @Composable
+private fun ProfileActionMenu(
+    followsViewer: Boolean,
+    viewerBlocks: Boolean,
+    isPerformingAction: Boolean,
+    onRemoveFollower: () -> Unit,
+    onBlock: () -> Unit,
+    onUnblock: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val colors = LocalAppColors.current
+
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                imageVector = Icons.Filled.MoreVert,
+                contentDescription = "More actions",
+                tint = colors.accent
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            if (followsViewer) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = stringResource(R.string.remove_follower),
+                            color = colors.reaction
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onRemoveFollower()
+                    },
+                    enabled = !isPerformingAction
+                )
+            }
+
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        text = stringResource(if (viewerBlocks) R.string.unblock else R.string.block),
+                        color = if (!viewerBlocks) colors.reaction else MaterialTheme.colorScheme.onSurface
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    if (viewerBlocks) onUnblock() else onBlock()
+                },
+                enabled = !isPerformingAction
+            )
+        }
+    }
+}
+
+@Composable
 private fun ProfileHeader(
     avatarUrl: String,
     name: String?,
     handle: String,
-    bio: String?
+    bio: String?,
+    isViewer: Boolean,
+    viewerFollows: Boolean,
+    followsViewer: Boolean,
+    viewerBlocks: Boolean,
+    isPerformingAction: Boolean,
+    onFollowClick: () -> Unit,
+    onUnfollowClick: () -> Unit,
+    onMentionClick: (String) -> Unit = {}
 ) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -161,32 +342,136 @@ private fun ProfileHeader(
             model = avatarUrl,
             contentDescription = null,
             modifier = Modifier
-                .size(96.dp)
+                .size(AppShapes.avatarProfile)
                 .clip(CircleShape),
             contentScale = ContentScale.Crop
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Text(
             text = name ?: handle,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
+            style = typography.titleMedium,
+            color = colors.textPrimary,
             textAlign = TextAlign.Center
         )
+
+        Spacer(modifier = Modifier.height(2.dp))
 
         Text(
             text = "@$handle",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = typography.bodyMedium,
+            color = colors.textSecondary,
             textAlign = TextAlign.Center
         )
 
-        if (!bio.isNullOrBlank()) {
+        if (!isViewer && (followsViewer || viewerBlocks)) {
+            Spacer(modifier = Modifier.height(6.dp))
+            RelationshipTags(
+                followsViewer = followsViewer,
+                viewerBlocks = viewerBlocks
+            )
+        }
+
+        if (!isViewer) {
             Spacer(modifier = Modifier.height(12.dp))
+
+            if (viewerFollows) {
+                OutlinedButton(
+                    onClick = onUnfollowClick,
+                    enabled = !isPerformingAction,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.5.dp, colors.buttonOutline),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = colors.accent
+                    )
+                ) {
+                    if (isPerformingAction) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = colors.accent,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.unfollow),
+                            modifier = Modifier.padding(horizontal = 28.dp)
+                        )
+                    }
+                }
+            } else {
+                Button(
+                    onClick = onFollowClick,
+                    enabled = !isPerformingAction,
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.accent,
+                        contentColor = Color.White
+                    )
+                ) {
+                    if (isPerformingAction) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.follow),
+                            modifier = Modifier.padding(horizontal = 28.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        if (!bio.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(10.dp))
             HtmlContent(
                 html = bio,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                onMentionClick = onMentionClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun RelationshipTags(
+    followsViewer: Boolean,
+    viewerBlocks: Boolean
+) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (followsViewer) {
+            Text(
+                text = stringResource(R.string.follows_you),
+                style = typography.caption,
+                color = colors.accentMuted,
+                modifier = Modifier
+                    .background(
+                        colors.accentMuted.copy(alpha = 0.10f),
+                        RoundedCornerShape(AppShapes.tagRadius)
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+
+        if (viewerBlocks) {
+            Text(
+                text = stringResource(R.string.blocked),
+                style = typography.caption,
+                color = colors.reaction,
+                modifier = Modifier
+                    .background(
+                        colors.reaction.copy(alpha = 0.10f),
+                        RoundedCornerShape(AppShapes.tagRadius)
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
     }

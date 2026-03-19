@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import pub.hackers.android.data.repository.HackersPubRepository
 import pub.hackers.android.domain.model.Notification
+import java.time.Instant
 import javax.inject.Inject
 
 data class NotificationsUiState(
@@ -30,8 +31,18 @@ class NotificationsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(NotificationsUiState())
     val uiState: StateFlow<NotificationsUiState> = _uiState.asStateFlow()
 
+    private var lastLoadTime: Instant? = null
+    private val staleThresholdSeconds = 60L
+
     init {
         loadNotifications()
+    }
+
+    fun refreshIfStale() {
+        val last = lastLoadTime ?: return
+        if (Instant.now().epochSecond - last.epochSecond > staleThresholdSeconds) {
+            refresh()
+        }
     }
 
     private fun loadNotifications() {
@@ -40,6 +51,7 @@ class NotificationsViewModel @Inject constructor(
 
             repository.getNotifications()
                 .onSuccess { result ->
+                    lastLoadTime = Instant.now()
                     _uiState.update {
                         it.copy(
                             notifications = result.notifications,
@@ -66,6 +78,7 @@ class NotificationsViewModel @Inject constructor(
 
             repository.getNotifications(refresh = true)
                 .onSuccess { result ->
+                    lastLoadTime = Instant.now()
                     _uiState.update {
                         it.copy(
                             notifications = result.notifications,

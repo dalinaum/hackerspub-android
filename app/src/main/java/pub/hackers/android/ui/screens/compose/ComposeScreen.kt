@@ -8,27 +8,25 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -36,20 +34,24 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import pub.hackers.android.ui.components.CompactTopBar
+import pub.hackers.android.ui.components.LargeTitleHeader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
@@ -71,11 +73,15 @@ import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.PostVisibility
 import pub.hackers.android.ui.components.HtmlContent
 import pub.hackers.android.ui.components.MentionAutocomplete
+import pub.hackers.android.ui.theme.AppShapes
+import pub.hackers.android.ui.theme.LocalAppColors
+import pub.hackers.android.ui.theme.LocalAppTypography
 import kotlin.math.roundToInt
 
 @Composable
 fun ComposeScreen(
     replyToId: String?,
+    quotedPostId: String? = null,
     onPostSuccess: () -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: ComposeViewModel = hiltViewModel()
@@ -83,6 +89,9 @@ fun ComposeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showVisibilityMenu by remember { mutableStateOf(false) }
+
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
 
     // Track TextFieldValue for cursor position
     var textFieldValue by remember {
@@ -94,6 +103,8 @@ fun ComposeScreen(
     var textFieldBounds by remember { mutableStateOf(Rect.Zero) }
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val scrollState = rememberScrollState()
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
     val density = LocalDensity.current
     val popupHeight = with(density) { 200.dp.toPx() } // Estimated popup height
 
@@ -111,6 +122,10 @@ fun ComposeScreen(
         replyToId?.let { viewModel.setReplyTarget(it) }
     }
 
+    LaunchedEffect(quotedPostId) {
+        quotedPostId?.let { viewModel.setQuotedPost(it) }
+    }
+
     LaunchedEffect(uiState.isPosted) {
         if (uiState.isPosted) {
             onPostSuccess()
@@ -124,25 +139,39 @@ fun ComposeScreen(
         }
     }
 
+    val postEnabled = uiState.content.isNotBlank() && !uiState.isPosting
+
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            CompactTopBar(
+            LargeTitleHeader(
                 title = if (replyToId != null) stringResource(R.string.reply) else stringResource(R.string.compose),
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(R.string.cancel)
+                leadingContent = {
+                    TextButton(onClick = onNavigateBack) {
+                        Text(
+                            text = stringResource(R.string.cancel),
+                            style = typography.bodyLarge,
+                            color = colors.accent
                         )
                     }
                 },
-                actions = {
+                trailingContent = {
                     Button(
                         onClick = { viewModel.post() },
-                        enabled = uiState.content.isNotBlank() && !uiState.isPosting
+                        enabled = postEnabled,
+                        shape = RoundedCornerShape(AppShapes.pillRadius),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.accent,
+                            contentColor = Color.White,
+                            disabledContainerColor = colors.accent,
+                            disabledContentColor = Color.White,
+                        ),
+                        modifier = Modifier.alpha(if (postEnabled) 1f else 0.4f)
                     ) {
-                        Text(stringResource(R.string.post))
+                        Text(
+                            text = stringResource(R.string.post),
+                            color = Color.White
+                        )
                     }
                 }
             )
@@ -180,12 +209,19 @@ fun ComposeScreen(
                             textFieldBounds = coordinates.boundsInWindow()
                         },
                     shape = RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    color = colors.surface,
+                    border = BorderStroke(1.dp, colors.divider)
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                focusRequester.requestFocus()
+                                keyboardController?.show()
+                            }
                             .padding(16.dp)
                             .verticalScroll(scrollState)
                     ) {
@@ -209,19 +245,21 @@ fun ComposeScreen(
                                     Rect.Zero
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester),
                             enabled = !uiState.isPosting,
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                color = MaterialTheme.colorScheme.onSurface
+                            textStyle = typography.bodyLarge.copy(
+                                color = colors.textBody
                             ),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            cursorBrush = SolidColor(colors.accent),
                             decorationBox = { innerTextField ->
                                 Box {
                                     if (textFieldValue.text.isEmpty()) {
                                         Text(
                                             text = stringResource(R.string.compose_hint),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            style = typography.bodyLarge,
+                                            color = colors.textSecondary
                                         )
                                     }
                                     innerTextField()
@@ -281,16 +319,18 @@ fun ComposeScreen(
                             PostVisibility.FOLLOWERS -> Icons.Outlined.Group
                             else -> Icons.Filled.Public
                         },
-                        contentDescription = null
+                        contentDescription = null,
+                        tint = colors.textSecondary
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        when (uiState.visibility) {
+                        text = when (uiState.visibility) {
                             PostVisibility.PUBLIC -> stringResource(R.string.visibility_public)
                             PostVisibility.UNLISTED -> stringResource(R.string.visibility_unlisted)
                             PostVisibility.FOLLOWERS -> stringResource(R.string.visibility_followers)
                             else -> stringResource(R.string.visibility_public)
-                        }
+                        },
+                        color = colors.textSecondary
                     )
 
                     DropdownMenu(
@@ -298,33 +338,60 @@ fun ComposeScreen(
                         onDismissRequest = { showVisibilityMenu = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.visibility_public)) },
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.visibility_public),
+                                    color = colors.textPrimary
+                                )
+                            },
                             onClick = {
                                 viewModel.updateVisibility(PostVisibility.PUBLIC)
                                 showVisibilityMenu = false
                             },
                             leadingIcon = {
-                                Icon(Icons.Filled.Public, contentDescription = null)
+                                Icon(
+                                    Icons.Filled.Public,
+                                    contentDescription = null,
+                                    tint = colors.textSecondary
+                                )
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.visibility_unlisted)) },
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.visibility_unlisted),
+                                    color = colors.textPrimary
+                                )
+                            },
                             onClick = {
                                 viewModel.updateVisibility(PostVisibility.UNLISTED)
                                 showVisibilityMenu = false
                             },
                             leadingIcon = {
-                                Icon(Icons.Outlined.Lock, contentDescription = null)
+                                Icon(
+                                    Icons.Outlined.Lock,
+                                    contentDescription = null,
+                                    tint = colors.textSecondary
+                                )
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.visibility_followers)) },
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.visibility_followers),
+                                    color = colors.textPrimary
+                                )
+                            },
                             onClick = {
                                 viewModel.updateVisibility(PostVisibility.FOLLOWERS)
                                 showVisibilityMenu = false
                             },
                             leadingIcon = {
-                                Icon(Icons.Outlined.Group, contentDescription = null)
+                                Icon(
+                                    Icons.Outlined.Group,
+                                    contentDescription = null,
+                                    tint = colors.textSecondary
+                                )
                             }
                         )
                     }
@@ -339,10 +406,13 @@ private fun ReplyTargetPreview(
     post: Post,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant
+        color = colors.surface
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -362,8 +432,8 @@ private fun ReplyTargetPreview(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = post.actor.name ?: post.actor.handle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = typography.labelMedium,
+                    color = colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

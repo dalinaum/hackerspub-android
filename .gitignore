@@ -70,3 +70,6 @@ lint/reports/
 
 # Apollo GraphQL generated files
 app/src/main/java/pub/hackers/android/graphql/
+
+# Superpowers brainstorming
+.superpowers/

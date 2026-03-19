@@ -29,6 +29,7 @@ fragment PostFields on Post {
     content
     excerpt
     url
+    iri
     viewerHasShared
     actor {
         ...ActorFields
@@ -49,6 +50,27 @@ fragment PostFields on Post {
     quotedPost {
         ...SharedPostFields
     }
+    reactionGroups {
+        __typename
+        ... on EmojiReactionGroup {
+            emoji
+            reactors(first: 20) {
+                totalCount
+                viewerHasReacted
+            }
+        }
+        ... on CustomEmojiReactionGroup {
+            customEmoji {
+                id
+                name
+                imageUrl
+            }
+            reactors(first: 20) {
+                totalCount
+                viewerHasReacted
+            }
+        }
+    }
 }
 
 fragment SharedPostFields on Post {
@@ -60,6 +82,7 @@ fragment SharedPostFields on Post {
     content
     excerpt
     url
+    iri
     viewerHasShared
     actor {
         ...ActorFields
@@ -234,6 +257,10 @@ query ActorByHandle($handle: String!, $after: String) {
     actorByHandle(handle: $handle, allowLocalHandle: true) {
         id
         handle
+        isViewer
+        viewerFollows
+        followsViewer
+        viewerBlocks
         name
         bio
         avatarUrl
@@ -277,6 +304,7 @@ query PostDetail($id: ID!, $repliesAfter: String) {
                             }
                         }
                         totalCount
+                        viewerHasReacted
                     }
                 }
                 ... on CustomEmojiReactionGroup {
@@ -292,6 +320,7 @@ query PostDetail($id: ID!, $repliesAfter: String) {
                             }
                         }
                         totalCount
+                        viewerHasReacted
                     }
                 }
             }
@@ -338,8 +367,8 @@ mutation CompleteLoginChallenge($token: UUID!, $code: String!) {
     }
 }
 
-mutation CreateNote($content: Markdown!, $language: Locale!, $visibility: PostVisibility!, $replyTargetId: ID) {
-    createNote(input: { content: $content, language: $language, visibility: $visibility, replyTargetId: $replyTargetId }) {
+mutation CreateNote($content: Markdown!, $language: Locale!, $visibility: PostVisibility!, $replyTargetId: ID, $quotedPostId: ID) {
+    createNote(input: { content: $content, language: $language, visibility: $visibility, replyTargetId: $replyTargetId, quotedPostId: $quotedPostId }) {
         ... on CreateNotePayload {
             note {
                 id
@@ -411,5 +440,191 @@ query SearchActorsByHandle($prefix: String!, $limit: Int = 10) {
         handle
         name
         avatarUrl
+    }
+}
+
+query PostShares($id: ID!, $after: String) {
+    node(id: $id) {
+        ... on Post {
+            shares(first: 20, after: $after) {
+                edges {
+                    cursor
+                    node {
+                        id
+                        actor {
+                            ...ActorFields
+                        }
+                    }
+                }
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+            }
+        }
+    }
+}
+
+query PostQuotes($id: ID!, $after: String) {
+    node(id: $id) {
+        ... on Post {
+            quotes(first: 20, after: $after) {
+                edges {
+                    cursor
+                    node {
+                        ...PostFields
+                        sharedPost {
+                            ...SharedPostFields
+                        }
+                    }
+                }
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+            }
+        }
+    }
+}
+
+mutation FollowActor($actorId: ID!) {
+    followActor(input: { actorId: $actorId }) {
+        ... on FollowActorPayload {
+            followee {
+                id
+            }
+            follower {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation UnfollowActor($actorId: ID!) {
+    unfollowActor(input: { actorId: $actorId }) {
+        ... on UnfollowActorPayload {
+            followee {
+                id
+            }
+            follower {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation BlockActor($actorId: ID!) {
+    blockActor(input: { actorId: $actorId }) {
+        ... on BlockActorPayload {
+            blockee {
+                id
+            }
+            blocker {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation UnblockActor($actorId: ID!) {
+    unblockActor(input: { actorId: $actorId }) {
+        ... on UnblockActorPayload {
+            blockee {
+                id
+            }
+            blocker {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation RemoveFollower($actorId: ID!) {
+    removeFollower(input: { actorId: $actorId }) {
+        ... on RemoveFollowerPayload {
+            followee {
+                id
+            }
+            follower {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation DeletePost($id: ID!) {
+    deletePost(input: { id: $id }) {
+        ... on DeletePostPayload {
+            deletedPostId
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+        ... on SharedPostDeletionNotAllowedError {
+            inputPath
+        }
+    }
+}
+
+mutation AddReactionToPost($postId: ID!, $emoji: String!) {
+    addReactionToPost(input: { postId: $postId, emoji: $emoji }) {
+        ... on AddReactionToPostPayload {
+            reaction {
+                id
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation RemoveReactionFromPost($postId: ID!, $emoji: String!) {
+    removeReactionFromPost(input: { postId: $postId, emoji: $emoji }) {
+        ... on RemoveReactionFromPostPayload {
+            success
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
     }
 }

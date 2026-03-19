@@ -21,8 +21,8 @@
     <string name="account_not_found">Account not found</string>
 
     <!-- Timeline -->
-    <string name="local_timeline">Local</string>
-    <string name="global_timeline">Global</string>
+    <string name="local_timeline">Hackers\' Pub</string>
+    <string name="global_timeline">Fediverse</string>
     <string name="personal_timeline">Home</string>
     <string name="no_posts">No posts yet</string>
     <string name="load_more">Load more</string>
@@ -33,6 +33,10 @@
     <string name="compose_hint">What\'s on your mind?</string>
     <string name="post">Post</string>
     <string name="cancel">Cancel</string>
+    <string name="compose_edit">Edit</string>
+    <string name="compose_preview">Preview</string>
+    <string name="compose_preview_empty">Write something to see the preview</string>
+    <string name="quote_load_failed">Unable to load quoted post</string>
     <string name="visibility_public">Public</string>
     <string name="visibility_unlisted">Unlisted</string>
     <string name="visibility_followers">Followers only</string>
@@ -44,13 +48,18 @@
     <string name="notification_quote">quoted your post</string>
     <string name="notification_share">shared your post</string>
     <string name="notification_react">reacted to your post</string>
-    <string name="no_notifications">No notifications</string>
+    <string name="no_notifications">No Notifications\nWhen you receive notifications, they\'ll appear here</string>
+    <string name="notification_post_unavailable">(Post unavailable)</string>
 
     <!-- Search -->
     <string name="search_hint">Search posts or users</string>
     <string name="search_posts">Posts</string>
     <string name="search_users">Users</string>
+    <string name="search_accounts">Accounts</string>
+    <string name="search_recent">Recent Searches</string>
+    <string name="search_clear_recent">Clear</string>
     <string name="no_results">No results found</string>
+    <string name="no_results_description">Try a different search term</string>
 
     <!-- Post -->
     <string name="article">Article</string>
@@ -64,6 +73,8 @@
     <string name="unshare">Unshare</string>
     <string name="reply">Reply</string>
     <string name="replying_to">Replying to</string>
+    <string name="read_more">Read more</string>
+    <string name="open_in_browser">Open in browser</string>
 
     <!-- Settings -->
     <string name="settings">Settings</string>
@@ -71,6 +82,39 @@
     <string name="version">Version</string>
     <string name="clear_cache">Clear Cache</string>
     <string name="cache_cleared">Cache cleared</string>
+    <string name="clear_cache_confirm_title">Clear Cache</string>
+    <string name="clear_cache_confirm_message">This will clear all cached data. Your timelines will be refreshed.</string>
+    <string name="clear_cache_confirm_action">Clear</string>
+    <string name="settings_engagement">Engagement</string>
+    <string name="settings_confirm_before_delete">Confirm before deleting</string>
+    <string name="settings_confirm_before_share">Confirm before sharing</string>
+    <string name="settings_typography">Typography</string>
+    <string name="settings_font_size">Font size</string>
+    <string name="settings_font_size_reset">Reset to default</string>
+    <string name="settings_links">Links</string>
+    <string name="settings_use_in_app_browser">Use in-app browser</string>
+    <string name="settings_timeline">Timeline</string>
+    <string name="settings_timeline_max_length">Post preview length</string>
+    <string name="settings_timeline_unlimited">Unlimited</string>
+
+    <!-- Profile -->
+    <string name="follow">Follow</string>
+    <string name="unfollow">Unfollow</string>
+    <string name="block">Block</string>
+    <string name="unblock">Unblock</string>
+    <string name="remove_follower">Remove follower</string>
+    <string name="follows_you">Follows you</string>
+    <string name="blocked">Blocked</string>
+    <string name="action_error">Error</string>
+    <string name="ok">OK</string>
+    <string name="quoting">Quoting</string>
+    <string name="delete_post">Delete</string>
+    <string name="delete_post_confirm">Are you sure you want to delete this post?</string>
+    <string name="delete_post_confirm_title">Delete Post</string>
+    <string name="share_confirm_title">Share this post?</string>
+    <string name="unshare_confirm_title">Unshare this post?</string>
+    <string name="share_confirm_action">Share</string>
+    <string name="unshare_confirm_action">Unshare</string>
 
     <!-- Errors -->
     <string name="error_generic">Something went wrong</string>

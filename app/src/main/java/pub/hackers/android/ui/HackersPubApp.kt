@@ -1,10 +1,6 @@
 package pub.hackers.android.ui
 
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
@@ -16,20 +12,15 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -38,6 +29,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import pub.hackers.android.R
+import androidx.compose.runtime.CompositionLocalProvider
+import pub.hackers.android.ui.components.BottomNavBar
+import pub.hackers.android.ui.components.BottomNavItem
+import pub.hackers.android.ui.components.LocalFontScale
+import pub.hackers.android.ui.components.ProvideInAppBrowserUriHandler
 import pub.hackers.android.ui.screens.auth.SignInScreen
 import pub.hackers.android.ui.screens.compose.ComposeScreen
 import pub.hackers.android.ui.screens.explore.ExploreScreen
@@ -90,10 +86,21 @@ sealed class Screen(
 }
 
 sealed class DetailScreen(val route: String) {
-    data object SignIn : DetailScreen("signin")
-    data object Compose : DetailScreen("compose?replyTo={replyTo}") {
-        fun createRoute(replyTo: String? = null) =
-            if (replyTo != null) "compose?replyTo=$replyTo" else "compose"
+    data object SignIn : DetailScreen("signin?token={token}&code={code}") {
+        fun createRoute(token: String? = null, code: String? = null): String {
+            val params = mutableListOf<String>()
+            if (token != null) params.add("token=$token")
+            if (code != null) params.add("code=$code")
+            return if (params.isEmpty()) "signin" else "signin?${params.joinToString("&")}"
+        }
+    }
+    data object Compose : DetailScreen("compose?replyTo={replyTo}&quoteOf={quoteOf}") {
+        fun createRoute(replyTo: String? = null, quoteOf: String? = null): String {
+            val params = mutableListOf<String>()
+            if (replyTo != null) params.add("replyTo=$replyTo")
+            if (quoteOf != null) params.add("quoteOf=$quoteOf")
+            return if (params.isEmpty()) "compose" else "compose?${params.joinToString("&")}"
+        }
     }
     data object PostDetail : DetailScreen("post/{postId}") {
         fun createRoute(postId: String) = "post/$postId"
@@ -105,53 +112,96 @@ sealed class DetailScreen(val route: String) {
 
 @Composable
 fun HackersPubApp(
+    deepLinkData: pub.hackers.android.DeepLinkData? = null,
     viewModel: AppViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState(initial = false)
 
+    val fontSizePercent by viewModel.preferencesManager.fontSizePercent.collectAsState(initial = 100)
+
+    // Handle deep link for verification
+    LaunchedEffect(deepLinkData) {
+        deepLinkData?.let {
+            navController.navigate("signin?token=${it.token}&code=${it.code}")
+        }
+    }
+
+    ProvideInAppBrowserUriHandler(preferencesManager = viewModel.preferencesManager) {
+    CompositionLocalProvider(LocalFontScale provides (fontSizePercent / 100f)) {
+
     val bottomNavItems = if (isLoggedIn) {
-        listOf(Screen.Timeline, Screen.Notifications, Screen.Explore, Screen.Search, Screen.Settings)
+        listOf(
+            BottomNavItem(
+                route = Screen.Timeline.route,
+                label = stringResource(R.string.nav_timeline),
+                icon = Icons.Outlined.Home,
+                selectedIcon = Icons.Filled.Home,
+            ),
+            BottomNavItem(
+                route = Screen.Explore.route,
+                label = stringResource(R.string.nav_explore),
+                icon = Icons.Outlined.Explore,
+                selectedIcon = Icons.Filled.Explore,
+            ),
+            BottomNavItem(
+                route = Screen.Notifications.route,
+                label = stringResource(R.string.nav_notifications),
+                icon = Icons.Outlined.Notifications,
+                selectedIcon = Icons.Filled.Notifications,
+                hasNotificationDot = false, // TODO: wire up unread notification state
+            ),
+            BottomNavItem(
+                route = Screen.Search.route,
+                label = stringResource(R.string.nav_search),
+                icon = Icons.Outlined.Search,
+                selectedIcon = Icons.Filled.Search,
+            ),
+        )
     } else {
-        listOf(Screen.Explore, Screen.Search, Screen.Settings)
+        listOf(
+            BottomNavItem(
+                route = Screen.Explore.route,
+                label = stringResource(R.string.nav_explore),
+                icon = Icons.Outlined.Explore,
+                selectedIcon = Icons.Filled.Explore,
+            ),
+            BottomNavItem(
+                route = Screen.Search.route,
+                label = stringResource(R.string.nav_search),
+                icon = Icons.Outlined.Search,
+                selectedIcon = Icons.Filled.Search,
+            ),
+            BottomNavItem(
+                route = Screen.Settings.route,
+                label = stringResource(R.string.nav_settings),
+                icon = Icons.Outlined.Settings,
+                selectedIcon = Icons.Filled.Settings,
+            ),
+        )
     }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val showBottomBar = bottomNavItems.any { it.route == currentDestination?.route }
+    val currentRoute = currentDestination?.route
+    val showBottomBar = bottomNavItems.any { it.route == currentRoute }
 
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(
-                    modifier = Modifier
-                        .windowInsetsPadding(WindowInsets.navigationBars)
-                        .height(56.dp),
-                    windowInsets = WindowInsets(0)
-                ) {
-                    bottomNavItems.forEach { screen ->
-                        val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    if (selected) screen.selectedIcon else screen.unselectedIcon,
-                                    contentDescription = stringResource(screen.titleResId)
-                                )
-                            },
-                            label = null,
-                            selected = selected,
-                            onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
+                BottomNavBar(
+                    items = bottomNavItems,
+                    selectedRoute = currentRoute ?: "",
+                    onItemSelected = { item ->
+                        navController.navigate(item.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
                             }
-                        )
-                    }
-                }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
             }
         }
     ) { innerPadding ->
@@ -170,6 +220,12 @@ fun HackersPubApp(
                     },
                     onComposeClick = { replyTo ->
                         navController.navigate(DetailScreen.Compose.createRoute(replyTo))
+                    },
+                    onQuoteClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
+                    },
+                    onSettingsClick = {
+                        navController.navigate(Screen.Settings.route)
                     }
                 )
             }
@@ -196,8 +252,11 @@ fun HackersPubApp(
                     onReplyClick = { postId ->
                         navController.navigate(DetailScreen.Compose.createRoute(postId))
                     },
+                    onQuoteClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
+                    },
                     onSignInClick = {
-                        navController.navigate(DetailScreen.SignIn.route)
+                        navController.navigate(DetailScreen.SignIn.createRoute())
                     },
                     isLoggedIn = isLoggedIn
                 )
@@ -210,6 +269,12 @@ fun HackersPubApp(
                     },
                     onProfileClick = { handle ->
                         navController.navigate(DetailScreen.Profile.createRoute(handle))
+                    },
+                    onReplyClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(replyTo = postId))
+                    },
+                    onQuoteClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
                     }
                 )
             }
@@ -217,7 +282,7 @@ fun HackersPubApp(
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onSignInClick = {
-                        navController.navigate(DetailScreen.SignIn.route)
+                        navController.navigate(DetailScreen.SignIn.createRoute())
                     },
                     onSignOutComplete = {
                         navController.navigate(Screen.Explore.route) {
@@ -228,8 +293,26 @@ fun HackersPubApp(
                 )
             }
 
-            composable(DetailScreen.SignIn.route) {
+            composable(
+                route = DetailScreen.SignIn.route,
+                arguments = listOf(
+                    navArgument("token") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("code") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { backStackEntry ->
+                val token = backStackEntry.arguments?.getString("token")
+                val code = backStackEntry.arguments?.getString("code")
                 SignInScreen(
+                    deepLinkToken = token,
+                    deepLinkCode = code,
                     onSignInSuccess = {
                         navController.navigate(Screen.Timeline.route) {
                             popUpTo(0) { inclusive = true }
@@ -248,12 +331,19 @@ fun HackersPubApp(
                         type = NavType.StringType
                         nullable = true
                         defaultValue = null
+                    },
+                    navArgument("quoteOf") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
                     }
                 )
             ) { backStackEntry ->
                 val replyTo = backStackEntry.arguments?.getString("replyTo")
+                val quoteOf = backStackEntry.arguments?.getString("quoteOf")
                 ComposeScreen(
                     replyToId = replyTo,
+                    quotedPostId = quoteOf,
                     onPostSuccess = {
                         navController.popBackStack()
                     },
@@ -277,11 +367,15 @@ fun HackersPubApp(
                         navController.navigate(DetailScreen.Profile.createRoute(handle))
                     },
                     onReplyClick = { id ->
-                        navController.navigate(DetailScreen.Compose.createRoute(id))
+                        navController.navigate(DetailScreen.Compose.createRoute(replyTo = id))
+                    },
+                    onQuoteClick = { id ->
+                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = id))
                     },
                     onPostClick = { id ->
                         navController.navigate(DetailScreen.PostDetail.createRoute(id))
-                    }
+                    },
+                    isLoggedIn = isLoggedIn
                 )
             }
 
@@ -297,9 +391,20 @@ fun HackersPubApp(
                     },
                     onPostClick = { postId ->
                         navController.navigate(DetailScreen.PostDetail.createRoute(postId))
+                    },
+                    onProfileClick = { profileHandle ->
+                        navController.navigate(DetailScreen.Profile.createRoute(profileHandle))
+                    },
+                    onReplyClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(replyTo = postId))
+                    },
+                    onQuoteClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
                     }
                 )
             }
         }
     }
+    } // CompositionLocalProvider
+    } // ProvideInAppBrowserUriHandler
 }
