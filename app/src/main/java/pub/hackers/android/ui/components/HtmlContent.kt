@@ -36,7 +36,8 @@ fun HtmlContent(
     modifier: Modifier = Modifier,
     fontScale: Float = 1f,
     onMentionClick: ((handle: String) -> Unit)? = null,
-    onLinkClick: ((url: String) -> Unit)? = null
+    onLinkClick: ((url: String) -> Unit)? = null,
+    onTextClick: (() -> Unit)? = null
 ) {
     val uriHandler = LocalUriHandler.current
     val colors = LocalAppColors.current
@@ -82,7 +83,11 @@ fun HtmlContent(
                     } else {
                         try { uriHandler.openUri(annotation.item) } catch (_: Exception) {}
                     }
+                    return@ClickableText
                 }
+
+            // No link or mention tapped — propagate to parent
+            onTextClick?.invoke()
         }
     )
 }

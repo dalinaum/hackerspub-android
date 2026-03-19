@@ -190,7 +190,8 @@ fun PostCard(
                     html = truncatedContent,
                     maxLines = if (contentMaxLength > 0) Int.MAX_VALUE else 10,
                     modifier = Modifier.fillMaxWidth(),
-                    onMentionClick = onProfileClick
+                    onMentionClick = onProfileClick,
+                    onTextClick = onClick
                 )
 
                 if (isTruncated || (contentMaxLength == 0 && displayPost.content.length > 500)) {
