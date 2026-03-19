@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -91,22 +92,6 @@ fun TimelineScreen(
                     )
                 }
 
-                // Compose + icon
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .background(color = colors.surface, shape = CircleShape)
-                        .clickable { onComposeClick(null) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = stringResource(R.string.compose),
-                        tint = colors.accent,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
                 // User avatar (if logged in)
                 if (userAvatarUrl != null) {
                     AsyncImage(
@@ -117,6 +102,18 @@ fun TimelineScreen(
                             .clip(CircleShape)
                     )
                 }
+            }
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { onComposeClick(null) },
+                containerColor = colors.accent,
+                contentColor = androidx.compose.ui.graphics.Color.White
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = stringResource(R.string.compose)
+                )
             }
         }
     ) { paddingValues ->
