@@ -1,8 +1,8 @@
 package pub.hackers.android.ui.screens.postdetail
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import android.content.Intent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,32 +21,51 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.automirrored.filled.ReplyAll
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.outlined.AddReaction
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.outlined.FormatQuote
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import pub.hackers.android.ui.components.LargeTitleHeader
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import android.content.Intent
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
@@ -56,15 +75,19 @@ import pub.hackers.android.domain.model.ReactionGroup
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
+import pub.hackers.android.ui.components.LargeTitleHeader
+import pub.hackers.android.ui.components.LoadingItem
 import pub.hackers.android.ui.components.MediaGrid
 import pub.hackers.android.ui.components.PostCard
 import pub.hackers.android.ui.components.QuotedPostPreview
+import pub.hackers.android.ui.components.ReactionPicker
 import pub.hackers.android.ui.theme.AppShapes
 import pub.hackers.android.ui.theme.LocalAppColors
 import pub.hackers.android.ui.theme.LocalAppTypography
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailScreen(
     postId: String,
@@ -73,18 +96,144 @@ fun PostDetailScreen(
     onReplyClick: (String) -> Unit,
     onQuoteClick: (String) -> Unit = {},
     onPostClick: (String) -> Unit,
-    isLoggedIn: Boolean = false,
+    isLoggedIn: Boolean = true,
     viewModel: PostDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val colors = LocalAppColors.current
-    val typography = LocalAppTypography.current
+    val confirmBeforeDelete by viewModel.preferencesManager.confirmBeforeDelete.collectAsState(initial = true)
+    val confirmBeforeShare by viewModel.preferencesManager.confirmBeforeShare.collectAsState(initial = false)
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showShareConfirmation by remember { mutableStateOf(false) }
+
+    // Navigate back after successful deletion
+    LaunchedEffect(uiState.isDeleted) {
+        if (uiState.isDeleted) {
+            onNavigateBack()
+        }
+    }
+
+    // Reaction picker bottom sheet
+    if (uiState.showReactionPicker) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.toggleReactionPicker() },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            ReactionPicker(
+                reactionGroups = uiState.reactionGroups,
+                isSubmitting = uiState.isReacting,
+                onEmojiSelect = { viewModel.toggleReaction(it) },
+                onClose = { viewModel.toggleReactionPicker() }
+            )
+        }
+    }
+
+    // Shares bottom sheet
+    if (uiState.showSharesSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.dismissSharesSheet() },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            SharesSheet(
+                actors = uiState.shareActors,
+                isLoading = uiState.isLoadingShares,
+                onProfileClick = { handle ->
+                    viewModel.dismissSharesSheet()
+                    onProfileClick(handle)
+                },
+                onClose = { viewModel.dismissSharesSheet() }
+            )
+        }
+    }
+
+    // Quotes bottom sheet
+    if (uiState.showQuotesSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.dismissQuotesSheet() },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            QuotesSheet(
+                posts = uiState.quotePosts,
+                isLoading = uiState.isLoadingQuotes,
+                onPostClick = { id ->
+                    viewModel.dismissQuotesSheet()
+                    onPostClick(id)
+                },
+                onClose = { viewModel.dismissQuotesSheet() }
+            )
+        }
+    }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text(stringResource(R.string.delete_post_confirm_title)) },
+            text = { Text(stringResource(R.string.delete_post_confirm)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmation = false
+                        viewModel.deletePost()
+                    }
+                ) {
+                    Text(
+                        stringResource(R.string.delete_post),
+                        color = colors.reaction
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (showShareConfirmation) {
+        val hasShared = uiState.post?.viewerHasShared == true
+        AlertDialog(
+            onDismissRequest = { showShareConfirmation = false },
+            title = {
+                Text(stringResource(if (hasShared) R.string.unshare_confirm_title else R.string.share_confirm_title))
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showShareConfirmation = false
+                        if (hasShared) viewModel.unsharePost() else viewModel.sharePost()
+                    }
+                ) {
+                    Text(stringResource(if (hasShared) R.string.unshare_confirm_action else R.string.share_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showShareConfirmation = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (uiState.deleteError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissDeleteError() },
+            title = { Text(stringResource(R.string.action_error)) },
+            text = { Text(uiState.deleteError ?: "") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissDeleteError() }) {
+                    Text(stringResource(R.string.ok))
+                }
+            }
+        )
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             LargeTitleHeader(
-                title = "Post",
+                title = if (uiState.post?.typename == "Article") "Article" else "Post",
                 leadingContent = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -93,11 +242,25 @@ fun PostDetailScreen(
                             tint = colors.accent
                         )
                     }
-                }
+                },
+                trailingContent = if (uiState.canDelete) {
+                    {
+                        PostDetailActionMenu(
+                            isDeleting = uiState.isDeleting,
+                            onDelete = {
+                                if (confirmBeforeDelete) {
+                                    showDeleteConfirmation = true
+                                } else {
+                                    viewModel.deletePost()
+                                }
+                            }
+                        )
+                    }
+                } else null
             )
         },
         floatingActionButton = {
-            if (uiState.post != null) {
+            if (uiState.post != null && isLoggedIn) {
                 FloatingActionButton(
                     onClick = { onReplyClick(postId) },
                     containerColor = colors.accent,
@@ -127,24 +290,96 @@ fun PostDetailScreen(
                     )
                 }
                 uiState.post != null -> {
-                    PostDetailContent(
-                        post = uiState.post!!,
-                        reactionGroups = uiState.reactionGroups,
-                        replies = uiState.replies,
-                        onProfileClick = onProfileClick,
-                        onPostClick = onPostClick,
-                        onReplyClick = onReplyClick,
-                        onQuoteClick = onQuoteClick,
-                        onShareClick = {
-                            if (uiState.post!!.viewerHasShared) {
-                                viewModel.unsharePost()
-                            } else {
-                                viewModel.sharePost()
+                    PullToRefreshBox(
+                        isRefreshing = uiState.isRefreshing,
+                        onRefresh = { viewModel.refresh() }
+                    ) {
+                        PostDetailContent(
+                            post = uiState.post!!,
+                            reactionGroups = uiState.reactionGroups,
+                            replies = uiState.replies,
+                            hasMoreReplies = uiState.hasMoreReplies,
+                            isLoadingMoreReplies = uiState.isLoadingMoreReplies,
+                            onLoadMoreReplies = { viewModel.loadMoreReplies() },
+                            onProfileClick = onProfileClick,
+                            onPostClick = onPostClick,
+                            onReplyClick = { onReplyClick(postId) },
+                            onShareClick = {
+                                if (confirmBeforeShare) {
+                                    showShareConfirmation = true
+                                } else {
+                                    if (uiState.post!!.viewerHasShared) {
+                                        viewModel.unsharePost()
+                                    } else {
+                                        viewModel.sharePost()
+                                    }
+                                }
+                            },
+                            onReactionClick = { emoji -> viewModel.toggleReaction(emoji) },
+                            onReactionPickerClick = { viewModel.toggleReactionPicker() },
+                            onQuoteClick = { onQuoteClick(postId) },
+                            onSharesClick = { viewModel.showSharesSheet() },
+                            onQuotesClick = { viewModel.showQuotesSheet() },
+                            onExternalShareClick = {
+                                val shareUrl = uiState.post?.url
+                                    ?: uiState.post?.iri
+                                if (shareUrl != null) {
+                                    val sendIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, null))
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PostDetailActionMenu(
+    isDeleting: Boolean,
+    onDelete: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val colors = LocalAppColors.current
+
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                imageVector = Icons.Filled.MoreVert,
+                contentDescription = "More actions"
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        text = stringResource(R.string.delete_post),
+                        color = colors.reaction
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = null,
+                        tint = colors.reaction
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onDelete()
+                },
+                enabled = !isDeleting
+            )
         }
     }
 }
@@ -154,13 +389,20 @@ private fun PostDetailContent(
     post: Post,
     reactionGroups: List<ReactionGroup>,
     replies: List<Post>,
+    hasMoreReplies: Boolean = false,
+    isLoadingMoreReplies: Boolean = false,
+    onLoadMoreReplies: () -> Unit = {},
     onProfileClick: (String) -> Unit,
     onPostClick: (String) -> Unit,
-    onReplyClick: (String) -> Unit,
-    onQuoteClick: (String) -> Unit,
-    onShareClick: () -> Unit
+    onShareClick: () -> Unit,
+    onReplyClick: () -> Unit,
+    onReactionClick: (String) -> Unit,
+    onReactionPickerClick: () -> Unit,
+    onQuoteClick: () -> Unit,
+    onSharesClick: () -> Unit,
+    onQuotesClick: () -> Unit,
+    onExternalShareClick: () -> Unit
 ) {
-    val context = LocalContext.current
     val colors = LocalAppColors.current
     val typography = LocalAppTypography.current
     val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a")
@@ -178,12 +420,32 @@ private fun PostDetailContent(
                         onClick = { onPostClick(post.replyTarget!!.id) },
                         onProfileClick = onProfileClick
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Reply,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = colors.textSecondary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "${stringResource(R.string.replying_to)} @${post.replyTarget!!.actor.handle}",
+                            style = typography.labelSmall,
+                            color = colors.textSecondary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
                     HorizontalDivider(color = colors.divider)
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // Author row: 42dp avatar, bodyLargeSemiBold name
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -192,13 +454,16 @@ private fun PostDetailContent(
                         contentDescription = null,
                         modifier = Modifier
                             .size(AppShapes.avatarTimeline)
-                            .clip(CircleShape),
+                            .clip(CircleShape)
+                            .clickable { onProfileClick(post.actor.handle) },
                         contentScale = ContentScale.Crop
                     )
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    Column {
+                    Column(
+                        modifier = Modifier.clickable { onProfileClick(post.actor.handle) }
+                    ) {
                         Text(
                             text = post.actor.name ?: post.actor.handle,
                             style = typography.bodyLargeSemiBold,
@@ -214,17 +479,22 @@ private fun PostDetailContent(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                val isArticle = post.typename == "Article"
+
                 post.name?.let { title ->
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = if (isArticle) typography.titleLarge else typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = colors.textPrimary
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(if (isArticle) 12.dp else 8.dp))
+                    if (isArticle) {
+                        HorizontalDivider(color = colors.divider)
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
                 }
 
-                // Body text in textBody color
                 HtmlContent(
                     html = post.content,
                     modifier = Modifier.fillMaxWidth(),
@@ -247,71 +517,90 @@ private fun PostDetailContent(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Timestamp: labelMedium + textSecondary
-                Text(
-                    text = dateFormatter.format(post.published),
-                    style = typography.labelMedium,
-                    color = colors.textSecondary
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = dateFormatter.format(post.published),
+                        style = typography.labelMedium,
+                        color = colors.textSecondary
+                    )
+
+                    if (post.visibility != pub.hackers.android.domain.model.PostVisibility.PUBLIC) {
+                        Text(
+                            text = "\u00B7",
+                            style = typography.labelMedium,
+                            color = colors.textSecondary
+                        )
+                        Icon(
+                            imageVector = when (post.visibility) {
+                                pub.hackers.android.domain.model.PostVisibility.UNLISTED -> Icons.Outlined.Lock
+                                pub.hackers.android.domain.model.PostVisibility.FOLLOWERS -> Icons.Outlined.Group
+                                pub.hackers.android.domain.model.PostVisibility.DIRECT -> Icons.Outlined.Lock
+                                else -> Icons.Filled.Public
+                            },
+                            contentDescription = when (post.visibility) {
+                                pub.hackers.android.domain.model.PostVisibility.UNLISTED -> "Unlisted"
+                                pub.hackers.android.domain.model.PostVisibility.FOLLOWERS -> "Followers only"
+                                pub.hackers.android.domain.model.PostVisibility.DIRECT -> "Direct"
+                                else -> "Public"
+                            },
+                            modifier = Modifier.size(14.dp),
+                            tint = colors.textSecondary
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Engagement stats row: count bold + textPrimary, labels + textSecondary
                 Row(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = buildAnnotatedString {
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = colors.textPrimary)) {
-                                append("${post.engagementStats.replies}")
-                            }
-                            append(" ")
-                            withStyle(SpanStyle(color = colors.textSecondary)) {
-                                append(stringResource(R.string.replies))
-                            }
-                        },
-                        style = typography.bodyMedium
+                        text = "${post.engagementStats.replies} ${stringResource(R.string.replies)}",
+                        style = typography.labelMedium,
+                        color = colors.textSecondary
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = buildAnnotatedString {
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = colors.textPrimary)) {
-                                append("${post.engagementStats.shares}")
-                            }
-                            append(" ")
-                            withStyle(SpanStyle(color = colors.textSecondary)) {
-                                append(stringResource(R.string.shares))
-                            }
-                        },
-                        style = typography.bodyMedium
+                        text = "${post.engagementStats.shares} ${stringResource(R.string.shares)}",
+                        style = typography.labelMedium,
+                        color = colors.accent,
+                        modifier = Modifier.clickable { onSharesClick() }
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = buildAnnotatedString {
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = colors.textPrimary)) {
-                                append("${post.engagementStats.reactions}")
-                            }
-                            append(" ")
-                            withStyle(SpanStyle(color = colors.textSecondary)) {
-                                append(stringResource(R.string.reactions))
-                            }
-                        },
-                        style = typography.bodyMedium
+                        text = "${post.engagementStats.reactions} ${stringResource(R.string.reactions)}",
+                        style = typography.labelMedium,
+                        color = colors.textSecondary
+                    )
+                    Text(
+                        text = "${post.engagementStats.quotes} ${stringResource(R.string.quotes)}",
+                        style = typography.labelMedium,
+                        color = colors.accent,
+                        modifier = Modifier.clickable { onQuotesClick() }
                     )
                 }
 
-                // Reaction groups
                 if (reactionGroups.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Row {
                         reactionGroups.forEach { group ->
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = colors.surface,
+                            Card(
+                                onClick = {
+                                    group.emoji?.let { onReactionClick(it) }
+                                },
+                                shape = RoundedCornerShape(AppShapes.reactionPillRadius),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (group.viewerHasReacted)
+                                        colors.accent.copy(alpha = 0.2f)
+                                    else
+                                        colors.surface
+                                ),
                                 modifier = Modifier.padding(end = 8.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     if (group.emoji != null) {
@@ -326,8 +615,11 @@ private fun PostDetailContent(
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = group.count.toString(),
-                                        style = typography.bodyMedium,
-                                        color = colors.textSecondary
+                                        style = typography.labelMedium,
+                                        color = if (group.viewerHasReacted)
+                                            colors.accent
+                                        else
+                                            colors.textPrimary
                                     )
                                 }
                             }
@@ -337,12 +629,18 @@ private fun PostDetailContent(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Action bar with dividers
                 HorizontalDivider(color = colors.divider)
 
                 Row(
                     modifier = Modifier.padding(vertical = 4.dp)
                 ) {
+                    IconButton(onClick = onReplyClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Reply,
+                            contentDescription = stringResource(R.string.reply),
+                            tint = colors.textSecondary
+                        )
+                    }
                     IconButton(onClick = onShareClick) {
                         Icon(
                             imageVector = Icons.Filled.Repeat,
@@ -350,8 +648,31 @@ private fun PostDetailContent(
                             tint = if (post.viewerHasShared)
                                 colors.share
                             else
-                                colors.textSecondary,
-                            modifier = Modifier.size(20.dp)
+                                colors.textSecondary
+                        )
+                    }
+                    IconButton(onClick = onReactionPickerClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.AddReaction,
+                            contentDescription = stringResource(R.string.reactions),
+                            tint = if (reactionGroups.any { it.viewerHasReacted })
+                                colors.accent
+                            else
+                                colors.textSecondary
+                        )
+                    }
+                    IconButton(onClick = onQuoteClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.FormatQuote,
+                            contentDescription = stringResource(R.string.quotes),
+                            tint = colors.textSecondary
+                        )
+                    }
+                    IconButton(onClick = onExternalShareClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.Share,
+                            contentDescription = stringResource(R.string.share),
+                            tint = colors.textSecondary
                         )
                     }
                 }
@@ -378,23 +699,187 @@ private fun PostDetailContent(
                     post = reply,
                     onClick = { onPostClick(reply.id) },
                     onProfileClick = onProfileClick,
-                    onReplyClick = { onReplyClick(reply.id) },
-                    onQuoteClick = { onQuoteClick(reply.id) },
-                    onReactionClick = { onPostClick(reply.id) },
-                    onExternalShareClick = {
-                        val shareUrl = reply.url ?: reply.iri
-                        if (shareUrl != null) {
-                            val sendIntent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, shareUrl)
-                                type = "text/plain"
-                            }
-                            context.startActivity(Intent.createChooser(sendIntent, null))
-                        }
-                    },
                     onQuotedPostClick = onPostClick
                 )
                 HorizontalDivider(thickness = 0.5.dp, color = colors.divider)
+            }
+
+            if (isLoadingMoreReplies) {
+                item {
+                    LoadingItem()
+                }
+            } else if (hasMoreReplies) {
+                item {
+                    TextButton(
+                        onClick = onLoadMoreReplies,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
+                        Text(stringResource(R.string.load_more))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SharesSheet(
+    actors: List<pub.hackers.android.domain.model.Actor>,
+    isLoading: Boolean,
+    onProfileClick: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.shares),
+            style = typography.bodyLargeSemiBold,
+            color = colors.textPrimary,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (actors.isEmpty()) {
+            Text(
+                text = "No shares yet",
+                style = typography.bodyMedium,
+                color = colors.textSecondary,
+                modifier = Modifier.padding(vertical = 24.dp)
+            )
+        } else {
+            actors.forEach { actor ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onProfileClick(actor.handle) }
+                        .padding(vertical = 8.dp)
+                ) {
+                    AsyncImage(
+                        model = actor.avatarUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = actor.name ?: actor.handle,
+                            style = typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = "@${actor.handle}",
+                            style = typography.labelMedium,
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuotesSheet(
+    posts: List<Post>,
+    isLoading: Boolean,
+    onPostClick: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.quotes),
+            style = typography.bodyLargeSemiBold,
+            color = colors.textPrimary,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (posts.isEmpty()) {
+            Text(
+                text = "No quotes yet",
+                style = typography.bodyMedium,
+                color = colors.textSecondary,
+                modifier = Modifier.padding(vertical = 24.dp)
+            )
+        } else {
+            posts.forEach { post ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPostClick(post.id) }
+                        .padding(vertical = 8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AsyncImage(
+                            model = post.actor.avatarUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(AppShapes.avatarQuoted)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = post.actor.name ?: post.actor.handle,
+                                style = typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "@${post.actor.handle}",
+                                style = typography.labelSmall,
+                                color = colors.textSecondary
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    HtmlContent(
+                        html = post.content,
+                        maxLines = 3,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                HorizontalDivider(
+                    color = colors.divider,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
             }
         }
     }
@@ -412,15 +897,7 @@ private fun ReplyTargetPreview(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .border(
-                width = 1.dp,
-                color = colors.divider,
-                shape = RoundedCornerShape(AppShapes.quotedPostRadius)
-            )
-            .clip(RoundedCornerShape(AppShapes.quotedPostRadius))
-            .background(colors.surface)
             .clickable(onClick = onClick)
-            .padding(8.dp)
             .alpha(0.6f)
     ) {
         Row(
