@@ -30,11 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import pub.hackers.android.R
 import pub.hackers.android.domain.model.ReactionGroup
+import pub.hackers.android.ui.theme.LocalAppColors
+import pub.hackers.android.ui.theme.LocalAppTypography
 
 val SUPPORTED_REACTION_EMOJIS = listOf("❤️", "🎉", "😂", "😲", "🤔", "😢", "👀")
 
@@ -68,15 +69,15 @@ fun ReactionPicker(
         ) {
             Text(
                 text = stringResource(R.string.reactions),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                style = LocalAppTypography.current.bodyLargeSemiBold,
+                color = LocalAppColors.current.textPrimary
             )
             IconButton(
                 onClick = onClose,
                 modifier = Modifier
                     .size(30.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(LocalAppColors.current.surface)
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
@@ -103,9 +104,9 @@ fun ReactionPicker(
                         .clip(RoundedCornerShape(8.dp))
                         .background(
                             if (existingGroup?.viewerHasReacted == true)
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                LocalAppColors.current.accent.copy(alpha = 0.15f)
                             else
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                LocalAppColors.current.surface
                         )
                         .clickable(enabled = !isSubmitting) { onEmojiSelect(emoji) }
                         .padding(vertical = 8.dp)
@@ -116,8 +117,8 @@ fun ReactionPicker(
                     )
                     Text(
                         text = (existingGroup?.count ?: 0).toString(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = LocalAppTypography.current.labelSmall,
+                        color = LocalAppColors.current.textSecondary
                     )
                 }
             }
@@ -125,7 +126,7 @@ fun ReactionPicker(
 
         if (selectedGroups.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider()
+            HorizontalDivider(color = LocalAppColors.current.divider)
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(
@@ -137,7 +138,7 @@ fun ReactionPicker(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                            .background(LocalAppColors.current.accent.copy(alpha = 0.15f))
                             .clickable(enabled = !isSubmitting && group.emoji != null) {
                                 group.emoji?.let { onEmojiSelect(it) }
                             }
@@ -155,7 +156,8 @@ fun ReactionPicker(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = group.count.toString(),
-                            style = MaterialTheme.typography.labelMedium
+                            style = LocalAppTypography.current.labelSmall,
+                            color = LocalAppColors.current.textSecondary
                         )
                     }
                 }

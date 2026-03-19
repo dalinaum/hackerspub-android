@@ -1,8 +1,6 @@
 package pub.hackers.android.ui.components
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.text.ClickableText
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
@@ -18,7 +16,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.sp
+import pub.hackers.android.ui.theme.LocalAppColors
+import pub.hackers.android.ui.theme.LocalAppTypography
 import java.net.URI
 
 val LocalFontScale = compositionLocalOf { 1f }
@@ -40,17 +39,18 @@ fun HtmlContent(
     onLinkClick: ((url: String) -> Unit)? = null
 ) {
     val uriHandler = LocalUriHandler.current
-    val isDark = isSystemInDarkTheme()
-    val linkColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB)
-    val mentionBg = linkColor.copy(alpha = 0.10f)
-    val textColor = MaterialTheme.colorScheme.onSurface
+    val colors = LocalAppColors.current
+    val linkColor = colors.accent
+    val mentionBg = colors.accent.copy(alpha = 0.10f)
+    val codeBackground = colors.surface
+    val textColor = colors.textBody
 
-    val annotatedString = remember(html, linkColor, mentionBg) {
-        parseHtmlToAnnotatedString(html, linkColor, mentionBg)
+    val annotatedString = remember(html, linkColor, mentionBg, codeBackground) {
+        parseHtmlToAnnotatedString(html, linkColor, mentionBg, codeBackground)
     }
 
     val effectiveFontScale = if (fontScale != 1f) fontScale else LocalFontScale.current
-    val baseStyle = MaterialTheme.typography.bodyMedium.copy(color = textColor)
+    val baseStyle = LocalAppTypography.current.bodyLarge.copy(color = textColor)
     val scaledStyle = if (effectiveFontScale != 1f) {
         baseStyle.copy(fontSize = baseStyle.fontSize * effectiveFontScale)
     } else baseStyle
@@ -107,7 +107,8 @@ private fun extractHandleFromUrl(url: String): String? {
 private fun parseHtmlToAnnotatedString(
     html: String,
     linkColor: Color,
-    mentionBg: Color
+    mentionBg: Color,
+    codeBackground: Color
 ): AnnotatedString {
     return buildAnnotatedString {
         var currentLinkType: LinkType? = null
@@ -146,7 +147,7 @@ private fun parseHtmlToAnnotatedString(
                             fontStyle = if (isItalic) FontStyle.Italic else null,
                             textDecoration = if (isStrikethrough) TextDecoration.LineThrough else null,
                             fontFamily = if (isCode || isPreformatted) FontFamily.Monospace else null,
-                            background = if (isCode && !isPreformatted) Color(0x20808080) else Color.Unspecified
+                            background = if (isCode && !isPreformatted) codeBackground else Color.Unspecified
                         )
 
                         if (isBold || isItalic || isStrikethrough || isCode || isPreformatted) {
