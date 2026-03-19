@@ -116,8 +116,11 @@ fun SearchScreen(
                             onRetry = { viewModel.search() }
                         )
                     }
-                    uiState.hasSearched && uiState.posts.isEmpty() -> {
-                        ErrorMessage(message = stringResource(R.string.no_results))
+                    uiState.hasSearched && uiState.posts.isEmpty() && uiState.actors.isEmpty() && uiState.resolvedObjectUrl == null -> {
+                        ErrorMessage(
+                            message = stringResource(R.string.no_results),
+                            icon = Icons.Filled.Search
+                        )
                     }
                     uiState.posts.isNotEmpty() || uiState.resolvedObjectUrl != null || uiState.actors.isNotEmpty() -> {
                         LazyColumn {

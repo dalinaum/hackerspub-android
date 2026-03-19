@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -128,7 +129,10 @@ fun NotificationsScreen(
                     )
                 }
                 uiState.notifications.isEmpty() -> {
-                    ErrorMessage(message = stringResource(R.string.no_notifications))
+                    ErrorMessage(
+                        message = stringResource(R.string.no_notifications),
+                        icon = Icons.Outlined.NotificationsOff
+                    )
                 }
                 else -> {
                     PullToRefreshBox(

@@ -111,7 +111,8 @@ fun TimelineScreen(
                 }
                 uiState.posts.isEmpty() -> {
                     ErrorMessage(
-                        message = stringResource(R.string.no_posts)
+                        message = stringResource(R.string.no_posts),
+                        icon = null
                     )
                 }
                 else -> {
