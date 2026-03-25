@@ -14,9 +14,13 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -113,17 +117,55 @@ sealed class DetailScreen(val route: String) {
 @Composable
 fun HackersPubApp(
     deepLinkData: pub.hackers.android.DeepLinkData? = null,
+    navigationIntent: pub.hackers.android.NavigationIntent? = null,
     viewModel: AppViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState(initial = false)
 
     val fontSizePercent by viewModel.preferencesManager.fontSizePercent.collectAsState(initial = 100)
+    val hasUnread by viewModel.hasUnread.collectAsState()
 
     // Handle deep link for verification
     LaunchedEffect(deepLinkData) {
         deepLinkData?.let {
             navController.navigate("signin?token=${it.token}&code=${it.code}")
+        }
+    }
+
+    // Handle navigation intent from system notifications
+    LaunchedEffect(navigationIntent) {
+        navigationIntent?.let {
+            navController.navigate(it.route) {
+                launchSingleTop = true
+            }
+        }
+    }
+
+    // Enqueue notification polling when user logs in
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            viewModel.enqueueNotificationPolling()
+            viewModel.startForegroundPolling()
+        } else {
+            viewModel.stopForegroundPolling()
+        }
+    }
+
+    // Start/stop foreground polling based on app lifecycle
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, isLoggedIn) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (!isLoggedIn) return@LifecycleEventObserver
+            when (event) {
+                Lifecycle.Event.ON_START -> viewModel.startForegroundPolling()
+                Lifecycle.Event.ON_STOP -> viewModel.stopForegroundPolling()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -149,7 +191,7 @@ fun HackersPubApp(
                 label = stringResource(R.string.nav_notifications),
                 icon = Icons.Outlined.Notifications,
                 selectedIcon = Icons.Filled.Notifications,
-                hasNotificationDot = false, // TODO: wire up unread notification state
+                hasNotificationDot = hasUnread,
             ),
             BottomNavItem(
                 route = Screen.Search.route,

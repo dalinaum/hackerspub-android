@@ -15,3 +15,6 @@
 
 # Coil
 -dontwarn coil.**
+
+# WorkManager HiltWorker
+-keep class pub.hackers.android.data.worker.NotificationWorker { *; }
