@@ -30,10 +30,15 @@ data class DeepLinkData(
     val code: String
 )
 
+data class NavigationIntent(
+    val route: String
+)
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private var deepLinkData by mutableStateOf<DeepLinkData?>(null)
+    private var navigationIntent by mutableStateOf<NavigationIntent?>(null)
 
     @Inject
     lateinit var sessionManager: SessionManager
@@ -47,6 +52,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleDeepLink(intent)
+        handleNavigationIntent(intent)
         requestNotificationPermissionIfNeeded()
         enableEdgeToEdge()
         setContent {
@@ -55,7 +61,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = LocalAppColors.current.background
                 ) {
-                    HackersPubApp(deepLinkData = deepLinkData)
+                    HackersPubApp(
+                        deepLinkData = deepLinkData,
+                        navigationIntent = navigationIntent
+                    )
                 }
             }
         }
@@ -64,6 +73,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleDeepLink(intent)
+        handleNavigationIntent(intent)
     }
 
     private fun requestNotificationPermissionIfNeeded() {
@@ -76,6 +86,11 @@ class MainActivity : ComponentActivity() {
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
+    }
+
+    private fun handleNavigationIntent(intent: Intent?) {
+        val route = intent?.getStringExtra("navigate_to") ?: return
+        navigationIntent = NavigationIntent(route = route)
     }
 
     private fun handleDeepLink(intent: Intent?) {

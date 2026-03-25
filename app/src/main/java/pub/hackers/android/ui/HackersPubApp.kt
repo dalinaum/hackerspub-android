@@ -113,6 +113,7 @@ sealed class DetailScreen(val route: String) {
 @Composable
 fun HackersPubApp(
     deepLinkData: pub.hackers.android.DeepLinkData? = null,
+    navigationIntent: pub.hackers.android.NavigationIntent? = null,
     viewModel: AppViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
@@ -125,6 +126,15 @@ fun HackersPubApp(
     LaunchedEffect(deepLinkData) {
         deepLinkData?.let {
             navController.navigate("signin?token=${it.token}&code=${it.code}")
+        }
+    }
+
+    // Handle navigation intent from system notifications
+    LaunchedEffect(navigationIntent) {
+        navigationIntent?.let {
+            navController.navigate(it.route) {
+                launchSingleTop = true
+            }
         }
     }
 
