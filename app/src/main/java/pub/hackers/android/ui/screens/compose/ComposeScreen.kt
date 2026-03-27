@@ -479,12 +479,12 @@ private fun ReplyTargetPreview(
             Spacer(modifier = Modifier.width(8.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = post.actor.name ?: post.actor.handle,
+                pub.hackers.android.ui.components.RichDisplayName(
+                    name = post.actor.name,
+                    fallback = post.actor.handle,
                     style = typography.labelMedium,
                     color = colors.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    emojiHeight = 14.dp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 HtmlContent(

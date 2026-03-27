@@ -170,10 +170,12 @@ private fun NoteCard(
                     contentScale = ContentScale.Crop
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "${post.actor.name ?: post.actor.handle} ${stringResource(R.string.share)}d",
+                RichDisplayName(
+                    name = post.actor.name?.let { "$it ${stringResource(R.string.share)}d" },
+                    fallback = "${post.actor.handle} ${stringResource(R.string.share)}d",
                     style = typography.caption,
-                    color = colors.textSecondary
+                    color = colors.textSecondary,
+                    emojiHeight = 14.dp
                 )
             }
         }
@@ -199,12 +201,11 @@ private fun NoteCard(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = displayPost.actor.name ?: displayPost.actor.handle,
+                    RichDisplayName(
+                        name = displayPost.actor.name,
+                        fallback = displayPost.actor.handle,
                         style = typography.bodyLargeSemiBold,
                         color = colors.textPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .weight(1f)
                             .clickable { onProfileClick(displayPost.actor.handle) }
@@ -587,12 +588,11 @@ fun QuotedPostPreview(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            Text(
-                text = post.actor.name ?: post.actor.handle,
+            RichDisplayName(
+                name = post.actor.name,
+                fallback = post.actor.handle,
                 style = typography.bodyLargeSemiBold,
                 color = colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .weight(1f, fill = false)
                     .clickable { onProfileClick(post.actor.handle) }
