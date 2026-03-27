@@ -340,7 +340,11 @@ fun ComposeScreen(
                     .padding(horizontal = 4.dp)
             ) {
                 TextButton(
-                    onClick = { showVisibilityMenu = true }
+                    onClick = { showVisibilityMenu = true },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 12.dp,
+                        vertical = 4.dp
+                    )
                 ) {
                     Icon(
                         imageVector = when (uiState.visibility) {

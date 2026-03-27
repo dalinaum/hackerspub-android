@@ -1,5 +1,6 @@
 package pub.hackers.android.ui
 
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Explore
@@ -250,7 +251,9 @@ fun HackersPubApp(
         NavHost(
             navController = navController,
             startDestination = if (isLoggedIn) Screen.Timeline.route else Screen.Explore.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
         ) {
             composable(Screen.Timeline.route) {
                 TimelineScreen(
