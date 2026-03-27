@@ -6,6 +6,7 @@ fragment ActorFields on Actor {
 }
 
 fragment MediaFields on PostMedium {
+    id
     url
     thumbnailUrl
     alt
