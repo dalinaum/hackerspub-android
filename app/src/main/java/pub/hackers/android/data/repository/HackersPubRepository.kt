@@ -108,7 +108,11 @@ class HackersPubRepository @Inject constructor(
                 Result.success(
                     TimelineResult(
                         posts = data?.edges?.mapNotNull { edge ->
-                            edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
+                            edge.node.postFields.toPost(
+                                sharedPost = edge.node.sharedPost?.sharedPostFields?.toPost(),
+                                replyTarget = edge.node.replyTarget?.postFields?.toPost(),
+                                visibility = edge.node.visibility.toPostVisibility()
+                            )
                         } ?: emptyList(),
                         hasNextPage = data?.pageInfo?.hasNextPage ?: false,
                         endCursor = data?.pageInfo?.endCursor

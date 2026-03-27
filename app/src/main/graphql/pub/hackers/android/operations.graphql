@@ -144,6 +144,10 @@ query PersonalTimeline($after: String) {
             cursor
             node {
                 ...PostFields
+                visibility
+                replyTarget {
+                    ...PostFields
+                }
                 sharedPost {
                     ...SharedPostFields
                 }

@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -177,6 +178,42 @@ private fun NoteCard(
                     color = colors.textSecondary,
                     emojiHeight = 14.dp
                 )
+            }
+        }
+
+        // Reply target preview (faded)
+        if (displayPost.replyTarget != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(0.5f)
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                AsyncImage(
+                    model = displayPost.replyTarget!!.actor.avatarUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(AppShapes.avatarRepost)
+                        .clip(CircleShape)
+                        .clickable { onProfileClick(displayPost.replyTarget!!.actor.handle) },
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    RichDisplayName(
+                        name = displayPost.replyTarget!!.actor.name,
+                        fallback = displayPost.replyTarget!!.actor.handle,
+                        style = typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = colors.textPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    HtmlContent(
+                        html = displayPost.replyTarget!!.content,
+                        maxLines = 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
 
