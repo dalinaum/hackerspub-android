@@ -367,6 +367,15 @@ private fun NoteCard(
                     MediaGrid(media = displayPost.media)
                 }
 
+                // Link preview (only when no media and no quoted post)
+                if (displayPost.media.isEmpty() && displayPost.quotedPost == null && displayPost.link != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LinkPreviewCard(
+                        link = displayPost.link!!,
+                        onProfileClick = onProfileClick
+                    )
+                }
+
                 // Quoted post
                 if (displayPost.quotedPost != null) {
                     Spacer(modifier = Modifier.height(8.dp))

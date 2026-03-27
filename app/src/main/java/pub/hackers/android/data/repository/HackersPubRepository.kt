@@ -768,6 +768,24 @@ class HackersPubRepository @Inject constructor(
             viewerHasShared = viewerHasShared,
             actor = actor.actorFields.toActor(),
             media = media.map { it.mediaFields.toMedia() },
+            link = link?.let { l ->
+                PostLink(
+                    title = l.title,
+                    description = l.description,
+                    url = l.url.toString(),
+                    siteName = l.siteName,
+                    author = l.author,
+                    image = l.image?.let { img ->
+                        PostLinkImage(
+                            url = img.url.toString(),
+                            alt = img.alt,
+                            width = img.width,
+                            height = img.height
+                        )
+                    },
+                    creator = l.creator?.actorFields?.toActor()
+                )
+            },
             engagementStats = engagementStats.engagementStatsFields.toEngagementStats(),
             mentions = mentions.edges.map { it.node.handle },
             sharedPost = sharedPost,

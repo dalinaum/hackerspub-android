@@ -24,6 +24,23 @@ data class EngagementStats(
     val quotes: Int
 )
 
+data class PostLinkImage(
+    val url: String,
+    val alt: String?,
+    val width: Int?,
+    val height: Int?
+)
+
+data class PostLink(
+    val title: String?,
+    val description: String?,
+    val url: String,
+    val siteName: String?,
+    val author: String?,
+    val image: PostLinkImage?,
+    val creator: Actor?
+)
+
 data class Post(
     val id: String,
     val typename: String,
@@ -37,6 +54,7 @@ data class Post(
     val viewerHasShared: Boolean,
     val actor: Actor,
     val media: List<Media>,
+    val link: PostLink? = null,
     val engagementStats: EngagementStats,
     val mentions: List<String>,
     val sharedPost: Post? = null,

@@ -37,6 +37,22 @@ fragment PostFields on Post {
     media {
         ...MediaFields
     }
+    link {
+        title
+        description
+        url
+        siteName
+        author
+        image {
+            url
+            alt
+            width
+            height
+        }
+        creator {
+            ...ActorFields
+        }
+    }
     engagementStats {
         ...EngagementStatsFields
     }
