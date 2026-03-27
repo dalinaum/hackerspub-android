@@ -788,6 +788,7 @@ private fun MediaImage(
     alt: String?,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalAppColors.current
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
 
@@ -795,7 +796,13 @@ private fun MediaImage(
         AsyncImage(
             model = url,
             contentDescription = alt,
-            modifier = modifier.combinedClickable(
+            modifier = modifier
+                .border(
+                    width = 1.dp,
+                    color = colors.divider,
+                    shape = RoundedCornerShape(AppShapes.mediaRadius)
+                )
+                .combinedClickable(
                 onClick = {
                     // Open image in browser/viewer
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
