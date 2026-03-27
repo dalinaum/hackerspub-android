@@ -43,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -109,6 +110,23 @@ fun ComposeScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val density = LocalDensity.current
     val popupHeight = with(density) { 200.dp.toPx() } // Estimated popup height
+    val coroutineScope = rememberCoroutineScope()
+
+    // Auto-scroll to keep cursor visible when text overflows
+    LaunchedEffect(cursorRect) {
+        if (cursorRect != Rect.Zero) {
+            val cursorBottom = cursorRect.bottom.toInt()
+            val cursorTop = cursorRect.top.toInt()
+            val viewportTop = scrollState.value
+            val viewportBottom = viewportTop + scrollState.viewportSize
+
+            if (cursorBottom > viewportBottom) {
+                scrollState.animateScrollTo(cursorBottom - scrollState.viewportSize)
+            } else if (cursorTop < viewportTop) {
+                scrollState.animateScrollTo(cursorTop)
+            }
+        }
+    }
 
     // Sync TextFieldValue with ViewModel state changes (e.g., when mention is selected)
     LaunchedEffect(uiState.content, uiState.cursorPosition) {
