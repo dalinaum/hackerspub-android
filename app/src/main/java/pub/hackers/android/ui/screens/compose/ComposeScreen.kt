@@ -19,9 +19,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -164,37 +167,28 @@ fun ComposeScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            LargeTitleHeader(
-                title = if (replyToId != null) stringResource(R.string.reply) else stringResource(R.string.compose),
-                leadingContent = {
-                    TextButton(onClick = onNavigateBack) {
-                        Text(
-                            text = stringResource(R.string.cancel),
-                            style = typography.bodyLarge,
-                            color = colors.composeAccent
-                        )
-                    }
-                },
-                trailingContent = {
-                    Button(
-                        onClick = { viewModel.post() },
-                        enabled = postEnabled,
-                        shape = RoundedCornerShape(AppShapes.pillRadius),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = colors.composeAccent,
-                            contentColor = Color.White,
-                            disabledContainerColor = colors.composeAccent,
-                            disabledContentColor = Color.White,
-                        ),
-                        modifier = Modifier.alpha(if (postEnabled) 1f else 0.4f)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.post),
-                            color = Color.White
-                        )
-                    }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 8.dp)
+            ) {
+                IconButton(
+                    onClick = onNavigateBack,
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.cancel),
+                        tint = colors.textPrimary
+                    )
                 }
-            )
+                Text(
+                    text = if (replyToId != null) stringResource(R.string.reply) else stringResource(R.string.compose),
+                    style = typography.titleLarge,
+                    color = colors.textPrimary,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
@@ -337,12 +331,14 @@ fun ComposeScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp)
+                    .padding(horizontal = 4.dp, vertical = 4.dp)
             ) {
+                Spacer(modifier = Modifier.weight(1f))
+
                 TextButton(
                     onClick = { showVisibilityMenu = true },
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        horizontal = 12.dp,
+                        horizontal = 8.dp,
                         vertical = 4.dp
                     )
                 ) {
@@ -353,18 +349,19 @@ fun ComposeScreen(
                             PostVisibility.FOLLOWERS -> Icons.Outlined.Group
                             else -> Icons.Filled.Public
                         },
-                        contentDescription = null,
-                        tint = colors.textSecondary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = when (uiState.visibility) {
+                        contentDescription = when (uiState.visibility) {
                             PostVisibility.PUBLIC -> stringResource(R.string.visibility_public)
                             PostVisibility.UNLISTED -> stringResource(R.string.visibility_unlisted)
                             PostVisibility.FOLLOWERS -> stringResource(R.string.visibility_followers)
                             else -> stringResource(R.string.visibility_public)
                         },
-                        color = colors.textSecondary
+                        tint = colors.textSecondary
+                    )
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(18.dp)
                     )
 
                     DropdownMenu(
@@ -429,6 +426,24 @@ fun ComposeScreen(
                             }
                         )
                     }
+                }
+
+                Button(
+                    onClick = { viewModel.post() },
+                    enabled = postEnabled,
+                    shape = RoundedCornerShape(AppShapes.pillRadius),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.composeAccent,
+                        contentColor = Color.White,
+                        disabledContainerColor = colors.composeAccent,
+                        disabledContentColor = Color.White,
+                    ),
+                    modifier = Modifier.alpha(if (postEnabled) 1f else 0.4f)
+                ) {
+                    Text(
+                        text = stringResource(R.string.post),
+                        color = Color.White
+                    )
                 }
             }
         }
