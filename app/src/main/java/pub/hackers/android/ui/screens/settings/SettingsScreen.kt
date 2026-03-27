@@ -228,7 +228,7 @@ fun SettingsScreen(
                         color = colors.textPrimary
                     )
                     Text(
-                        text = "${stringResource(R.string.version)} 1.0.0",
+                        text = "${stringResource(R.string.version)} ${uiState.appVersion}",
                         style = typography.bodyMedium,
                         color = colors.textSecondary
                     )
