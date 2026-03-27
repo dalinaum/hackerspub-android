@@ -199,17 +199,32 @@ private fun NoteCard(
             Column(modifier = Modifier.weight(1f)) {
                 // Author row — name left, visibility icon + timestamp right
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    RichDisplayName(
-                        name = displayPost.actor.name,
-                        fallback = displayPost.actor.handle,
-                        style = typography.bodyLargeSemiBold,
-                        color = colors.textPrimary,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onProfileClick(displayPost.actor.handle) }
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        RichDisplayName(
+                            name = displayPost.actor.name,
+                            fallback = displayPost.actor.handle,
+                            style = typography.bodyLargeSemiBold,
+                            color = colors.textPrimary,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .clickable { onProfileClick(displayPost.actor.handle) }
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "@${displayPost.actor.handle}",
+                            style = typography.labelMedium,
+                            color = colors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(2f, fill = false)
+                        )
+                    }
                     Spacer(modifier = Modifier.width(8.dp))
                     Icon(
                         imageVector = when (displayPost.visibility) {
