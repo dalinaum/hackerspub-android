@@ -541,14 +541,12 @@ private fun EngagementBar(
             isActive = isReplied
         )
 
-        // Share/Repost
-        EngagementButton(
-            icon = if (isShared) Icons.Filled.Repeat else Icons.Outlined.Repeat,
+        // Share/Repost — tap to show repost/quote menu
+        ShareEngagementButton(
+            isShared = isShared,
             count = post.engagementStats.shares,
-            contentDescription = stringResource(R.string.shares),
-            onClick = onShareClick,
-            activeColor = colors.share,
-            isActive = isShared
+            onShareClick = onShareClick,
+            onQuoteClick = onQuoteClick
         )
 
         // Heart/React — tap to toggle ❤️, long-press for emoji picker
@@ -557,16 +555,6 @@ private fun EngagementBar(
             count = post.engagementStats.reactions,
             onClick = onReactionClick,
             onLongClick = onReactionLongPress
-        )
-
-        // Quote
-        EngagementButton(
-            icon = Icons.Outlined.FormatQuote,
-            count = post.engagementStats.quotes,
-            contentDescription = stringResource(R.string.quotes),
-            onClick = onQuoteClick,
-            activeColor = colors.accent,
-            isActive = false
         )
 
         // External share — always textSecondary
@@ -618,6 +606,80 @@ private fun EngagementButton(
                 style = typography.labelMedium,
                 color = tint
             )
+        }
+    }
+}
+
+@Composable
+private fun ShareEngagementButton(
+    isShared: Boolean,
+    count: Int,
+    onShareClick: (() -> Unit)?,
+    onQuoteClick: (() -> Unit)? = null
+) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+    val tint = if (isShared) colors.share else colors.textSecondary
+    var showMenu by remember { mutableStateOf(false) }
+
+    Box {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = { if (onShareClick != null) showMenu = true },
+                enabled = onShareClick != null
+            ) {
+                Icon(
+                    imageVector = if (isShared) Icons.Filled.Repeat else Icons.Outlined.Repeat,
+                    contentDescription = stringResource(R.string.shares),
+                    tint = tint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            if (count > 0) {
+                Text(
+                    text = formatCount(count),
+                    style = typography.labelMedium,
+                    color = tint
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.share)) },
+                onClick = {
+                    showMenu = false
+                    onShareClick?.invoke()
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Repeat,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            )
+            if (onQuoteClick != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.quotes)) },
+                    onClick = {
+                        showMenu = false
+                        onQuoteClick()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.FormatQuote,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                )
+            }
         }
     }
 }
