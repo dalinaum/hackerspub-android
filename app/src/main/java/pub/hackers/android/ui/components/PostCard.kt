@@ -36,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Repeat
@@ -1005,10 +1006,12 @@ private fun MediaPreviewDialog(
 ) {
     val colors = LocalAppColors.current
     val typography = LocalAppTypography.current
+    val context = LocalContext.current
 
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
+    var showMenu by remember { mutableStateOf(false) }
     val transformState = rememberTransformableState { zoomChange, panChange, _ ->
         scale = (scale * zoomChange).coerceIn(1f, 5f)
         if (scale > 1f) {
@@ -1051,22 +1054,78 @@ private fun MediaPreviewDialog(
             }
 
             // Zoomable image
-            AsyncImage(
-                model = url,
-                contentDescription = alt,
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.Center)
                     .padding(16.dp)
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        translationX = offsetX,
-                        translationY = offsetY
+            ) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = alt,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offsetX,
+                            translationY = offsetY
+                        )
+                        .transformable(state = transformState)
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = { showMenu = true }
+                        ),
+                    contentScale = ContentScale.Fit
+                )
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.download)) },
+                        onClick = {
+                            showMenu = false
+                            val request = android.app.DownloadManager.Request(Uri.parse(url))
+                                .setNotificationVisibility(
+                                    android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                                )
+                                .setDestinationInExternalPublicDir(
+                                    android.os.Environment.DIRECTORY_DOWNLOADS,
+                                    url.substringAfterLast('/')
+                                )
+                            val dm = context.getSystemService(android.content.Context.DOWNLOAD_SERVICE)
+                                as android.app.DownloadManager
+                            dm.enqueue(request)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = null
+                            )
+                        }
                     )
-                    .transformable(state = transformState),
-                contentScale = ContentScale.Fit
-            )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.share)) },
+                        onClick = {
+                            showMenu = false
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, url)
+                                type = "text/plain"
+                            }
+                            context.startActivity(Intent.createChooser(sendIntent, null))
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Share,
+                                contentDescription = null
+                            )
+                        }
+                    )
+                }
+            }
 
             // Alt text
             if (!alt.isNullOrBlank()) {
