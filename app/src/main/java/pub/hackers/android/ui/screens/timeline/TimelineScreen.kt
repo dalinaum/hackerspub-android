@@ -26,8 +26,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +56,7 @@ fun TimelineScreen(
     onQuoteClick: (String) -> Unit = {},
     onSettingsClick: () -> Unit,
     postedAt: Long = 0L,
+    tabRetapped: Long = 0L,
     userAvatarUrl: String? = null,
     viewModel: TimelineViewModel = hiltViewModel()
 ) {
@@ -61,6 +64,7 @@ fun TimelineScreen(
     val listState = rememberLazyListState()
     val context = LocalContext.current
     val colors = LocalAppColors.current
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(postedAt) {
         if (postedAt > 0L) {
@@ -70,6 +74,16 @@ fun TimelineScreen(
                 .dropWhile { !it.isRefreshing }
                 .first { !it.isRefreshing }
             listState.scrollToItem(0)
+        }
+    }
+
+    LaunchedEffect(tabRetapped) {
+        if (tabRetapped > 0L) {
+            if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                viewModel.refresh()
+            } else {
+                listState.animateScrollToItem(0)
+            }
         }
     }
 
