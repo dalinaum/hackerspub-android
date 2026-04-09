@@ -529,7 +529,7 @@ private fun EngagementBar(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalAlignment = Alignment.CenterVertically
     ) {
         // Reply
         EngagementButton(
@@ -556,6 +556,8 @@ private fun EngagementBar(
             onClick = onReactionClick,
             onLongClick = onReactionLongPress
         )
+
+        Spacer(modifier = Modifier.weight(1f))
 
         // External share — always textSecondary
         if (onExternalShareClick != null) {
@@ -600,13 +602,11 @@ private fun EngagementButton(
                 modifier = Modifier.size(20.dp)
             )
         }
-        if (count > 0) {
-            Text(
-                text = formatCount(count),
-                style = typography.labelMedium,
-                color = tint
-            )
-        }
+        Text(
+            text = formatCount(count),
+            style = typography.labelMedium,
+            color = tint
+        )
     }
 }
 
@@ -637,13 +637,11 @@ private fun ShareEngagementButton(
                     modifier = Modifier.size(20.dp)
                 )
             }
-            if (count > 0) {
-                Text(
-                    text = formatCount(count),
-                    style = typography.labelMedium,
-                    color = tint
-                )
-            }
+            Text(
+                text = formatCount(count),
+                style = typography.labelMedium,
+                color = tint
+            )
         }
 
         DropdownMenu(
@@ -715,13 +713,11 @@ private fun ReactionEngagementButton(
                 modifier = Modifier.size(20.dp)
             )
         }
-        if (count > 0) {
-            Text(
-                text = formatCount(count),
-                style = typography.labelMedium,
-                color = tint
-            )
-        }
+        Text(
+            text = formatCount(count),
+            style = typography.labelMedium,
+            color = tint
+        )
     }
 }
 
