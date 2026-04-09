@@ -2,6 +2,8 @@ package pub.hackers.android.ui.screens.postdetail
 
 import android.content.Intent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,7 +83,7 @@ import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
 import pub.hackers.android.ui.components.LargeTitleHeader
 import pub.hackers.android.ui.components.LoadingItem
-import pub.hackers.android.ui.components.MediaGrid
+import pub.hackers.android.ui.components.MediaImage
 import pub.hackers.android.ui.components.PostCard
 import pub.hackers.android.ui.components.QuotedPostPreview
 import pub.hackers.android.ui.components.ReactionPicker
@@ -595,7 +597,7 @@ private fun PostDetailContent(
 
                 if (post.media.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    MediaGrid(media = post.media)
+                    MediaCarousel(media = post.media)
                 }
 
                 if (post.quotedPost != null) {
@@ -1055,8 +1057,52 @@ private fun ReplyTargetPreview(
 
         if (post.media.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
-            MediaGrid(media = post.media)
+            MediaCarousel(media = post.media)
         }
+    }
+}
+
+@Composable
+private fun MediaCarousel(media: List<pub.hackers.android.domain.model.Media>) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+
+    if (media.size == 1) {
+        MediaImage(
+            url = media[0].url,
+            alt = media[0].alt,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(250.dp)
+                .clip(RoundedCornerShape(AppShapes.mediaRadius))
+        )
+    } else {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+        ) {
+            media.forEach { item ->
+                MediaImage(
+                    url = item.url,
+                    alt = item.alt,
+                    modifier = Modifier
+                        .height(250.dp)
+                        .width(300.dp)
+                        .clip(RoundedCornerShape(AppShapes.mediaRadius))
+                )
+            }
+        }
+    }
+
+    if (media.size > 1) {
+        Text(
+            text = "${media.size} images",
+            style = typography.labelSmall,
+            color = colors.textSecondary,
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
 }
 
