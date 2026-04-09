@@ -163,6 +163,10 @@ fun ComposeScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
     val postEnabled = uiState.content.isNotBlank() && !uiState.isPosting
 
     Scaffold(
