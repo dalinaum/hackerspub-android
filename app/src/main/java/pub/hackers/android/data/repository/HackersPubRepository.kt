@@ -59,7 +59,7 @@ class HackersPubRepository @Inject constructor(
                     TimelineResult(
                         posts = data?.edges?.mapNotNull { edge ->
                             edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
-                        } ?: emptyList(),
+                        }?.distinctBy { it.id } ?: emptyList(),
                         hasNextPage = data?.pageInfo?.hasNextPage ?: false,
                         endCursor = data?.pageInfo?.endCursor
                     )
@@ -84,7 +84,7 @@ class HackersPubRepository @Inject constructor(
                     TimelineResult(
                         posts = data?.edges?.mapNotNull { edge ->
                             edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
-                        } ?: emptyList(),
+                        }?.distinctBy { it.id } ?: emptyList(),
                         hasNextPage = data?.pageInfo?.hasNextPage ?: false,
                         endCursor = data?.pageInfo?.endCursor
                     )
