@@ -1,0 +1,52 @@
+package pub.hackers.android.data.auth
+
+import android.app.Activity
+import android.content.Context
+import androidx.credentials.CreatePublicKeyCredentialRequest
+import androidx.credentials.CreatePublicKeyCredentialResponse
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetPublicKeyCredentialOption
+import androidx.credentials.PublicKeyCredential
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class PasskeyManager @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    private val credentialManager = CredentialManager.create(context)
+
+    suspend fun authenticate(optionsJson: String, activity: Activity): String {
+        android.util.Log.d("PasskeyAuth", "authenticate: creating request with options: ${optionsJson.take(200)}")
+        val request = GetCredentialRequest(
+            listOf(GetPublicKeyCredentialOption(optionsJson))
+        )
+        android.util.Log.d("PasskeyAuth", "authenticate: calling getCredential")
+        try {
+            val result = credentialManager.getCredential(activity, request)
+            android.util.Log.d("PasskeyAuth", "authenticate: got result, credential type=${result.credential.type}")
+            val credential = result.credential as PublicKeyCredential
+            android.util.Log.d("PasskeyAuth", "authenticate: success")
+            return credential.authenticationResponseJson
+        } catch (e: Exception) {
+            android.util.Log.e("PasskeyAuth", "authenticate: failed", e)
+            throw e
+        }
+    }
+
+    suspend fun register(optionsJson: String, activity: Activity): String {
+        android.util.Log.d("PasskeyAuth", "register: creating request")
+        val request = CreatePublicKeyCredentialRequest(optionsJson)
+        try {
+            val result = credentialManager.createCredential(activity, request)
+            android.util.Log.d("PasskeyAuth", "register: success")
+            val credential = result as CreatePublicKeyCredentialResponse
+            return credential.registrationResponseJson
+        } catch (e: Exception) {
+            android.util.Log.e("PasskeyAuth", "register: failed", e)
+            throw e
+        }
+    }
+}
