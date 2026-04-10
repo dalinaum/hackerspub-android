@@ -146,7 +146,7 @@ class ExploreViewModel @Inject constructor(
                 .onSuccess { data ->
                     _uiState.update {
                         it.copy(
-                            posts = it.posts + data.posts,
+                            posts = (it.posts + data.posts).distinctBy { p -> p.id },
                             hasNextPage = data.hasNextPage,
                             endCursor = data.endCursor,
                             isLoadingMore = false

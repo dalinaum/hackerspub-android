@@ -198,7 +198,7 @@ fun TimelineScreen(
                         ) {
                             items(
                                 items = uiState.posts,
-                                key = { "${it.id}_${it.sharedPost?.id.orEmpty()}" }
+                                key = { it.id }
                             ) { post ->
                                 PostCard(
                                     post = post,

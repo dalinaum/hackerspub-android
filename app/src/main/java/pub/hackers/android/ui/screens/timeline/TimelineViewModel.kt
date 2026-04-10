@@ -114,7 +114,7 @@ class TimelineViewModel @Inject constructor(
                 .onSuccess { result ->
                     _uiState.update {
                         it.copy(
-                            posts = it.posts + result.posts,
+                            posts = (it.posts + result.posts).distinctBy { p -> p.id },
                             hasNextPage = result.hasNextPage,
                             endCursor = result.endCursor,
                             isLoadingMore = false
