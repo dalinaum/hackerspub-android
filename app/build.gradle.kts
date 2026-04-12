@@ -79,10 +79,13 @@ apollo {
     }
 }
 
-composeCompiler {
-    reportsDestination = layout.buildDirectory.dir("compose_compiler")
-    metricsDestination = layout.buildDirectory.dir("compose_compiler")
-}
+// Uncomment to regenerate Compose stability reports at
+// app/build/compose_compiler/. Useful when diagnosing why a Composable
+// isn't skipping; kept off by default to avoid extra compile artifacts.
+// composeCompiler {
+//     reportsDestination = layout.buildDirectory.dir("compose_compiler")
+//     metricsDestination = layout.buildDirectory.dir("compose_compiler")
+// }
 
 dependencies {
     implementation(libs.androidx.core.ktx)
