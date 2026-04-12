@@ -45,22 +45,26 @@ class CursorPagingSource<T : Any>(
 /**
  * Convenience factory — wraps [CursorPagingSource] with our standard [PagingConfig].
  *
- * Defaults match existing manual pagination behavior:
- * - pageSize 20 matches the server's GraphQL `first: 20`
- * - prefetchDistance 3 matches the existing "load more when within 3 from end" threshold
- * - initialLoadSize 20 avoids the default 3*pageSize (60) first-page fetch
- * - placeholders disabled (existing UI has no skeleton support)
+ * - pageSize 20 matches the server's GraphQL `first: 20`.
+ * - prefetchDistance 20 (one full page ahead) triggers the next fetch early
+ *   enough that fast scrolling rarely stalls waiting for network.
+ * - initialLoadSize 30 (1.5 pages) balances first-response latency against
+ *   scroll buffer. Response payloads for this schema are large (~15 KB per
+ *   post), so a smaller first fetch keeps cold-start snappy while
+ *   prefetchDistance=20 starts page 2 almost immediately.
+ * - placeholders disabled (existing UI has no skeleton support).
  */
 fun <T : Any> cursorPager(
     pageSize: Int = 20,
-    prefetchDistance: Int = 3,
+    prefetchDistance: Int = 20,
+    initialLoadSize: Int = 30,
     fetch: suspend (String?) -> Result<CursorPage<T>>,
 ): Pager<String, T> = Pager(
     config = PagingConfig(
         pageSize = pageSize,
         prefetchDistance = prefetchDistance,
         enablePlaceholders = false,
-        initialLoadSize = pageSize,
+        initialLoadSize = initialLoadSize,
     ),
     pagingSourceFactory = { CursorPagingSource(fetch) },
 )
@@ -87,6 +91,18 @@ suspend fun HackersPubRepository.localTimelinePage(after: String?) =
 
 suspend fun HackersPubRepository.postRepliesPage(postId: String, after: String?) =
     getPostReplies(postId, after)
+        .map { CursorPage(it.posts, it.endCursor, it.hasNextPage) }
+
+suspend fun HackersPubRepository.actorPostsPage(handle: String, after: String?) =
+    getActorPosts(handle, after)
+        .map { CursorPage(it.posts, it.endCursor, it.hasNextPage) }
+
+suspend fun HackersPubRepository.actorNotesPage(handle: String, after: String?) =
+    getActorNotes(handle, after)
+        .map { CursorPage(it.posts, it.endCursor, it.hasNextPage) }
+
+suspend fun HackersPubRepository.actorArticlesPage(handle: String, after: String?) =
+    getActorArticles(handle, after)
         .map { CursorPage(it.posts, it.endCursor, it.hasNextPage) }
 
 // endregion

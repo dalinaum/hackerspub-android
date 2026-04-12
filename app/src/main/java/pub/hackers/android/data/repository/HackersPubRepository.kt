@@ -32,6 +32,7 @@ import pub.hackers.android.domain.model.Viewer
 import pub.hackers.android.graphql.ActorArticlesQuery
 import pub.hackers.android.graphql.ActorByHandleQuery
 import pub.hackers.android.graphql.ActorNotesQuery
+import pub.hackers.android.graphql.ActorPostsQuery
 import pub.hackers.android.graphql.AddReactionToPostMutation
 import pub.hackers.android.graphql.BlockActorMutation
 import pub.hackers.android.graphql.CompleteLoginChallengeMutation
@@ -328,6 +329,37 @@ class HackersPubRepository @Inject constructor(
                         },
                         hasNextPage = replies.pageInfo.hasNextPage,
                         endCursor = replies.pageInfo.endCursor
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getActorPosts(handle: String, after: String? = null): Result<TimelineResult> {
+        return try {
+            val response = apolloClient.query(
+                ActorPostsQuery(handle, Optional.presentIfNotNull(after))
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
+            } else {
+                val posts = response.data?.actorByHandle?.posts
+                    ?: return Result.failure(Exception("Actor not found"))
+
+                Result.success(
+                    TimelineResult(
+                        posts = posts.edges.mapNotNull { edge ->
+                            edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
+                        },
+                        hasNextPage = posts.pageInfo.hasNextPage,
+                        endCursor = posts.pageInfo.endCursor
                     )
                 )
             }

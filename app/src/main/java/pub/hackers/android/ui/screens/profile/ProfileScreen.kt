@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,9 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,14 +60,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import coil.compose.AsyncImage
 import pub.hackers.android.R
 import pub.hackers.android.domain.model.AccountLink
 import pub.hackers.android.domain.model.ActorField
-import pub.hackers.android.ui.components.LargeTitleHeader
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
+import pub.hackers.android.ui.components.LargeTitleHeader
 import pub.hackers.android.ui.components.LoadingItem
 import pub.hackers.android.ui.components.PostCard
 import pub.hackers.android.ui.theme.AppShapes
@@ -93,17 +93,16 @@ fun ProfileScreen(
     val context = LocalContext.current
     val colors = LocalAppColors.current
 
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-            lastVisibleItem != null && lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 3
-        }
-    }
-
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore && uiState.hasNextPage && !uiState.isLoadingMore) {
-            viewModel.loadMore()
-        }
+    // One LazyPagingItems per tab; active tab is chosen by selectedTab below.
+    // Inactive tabs still collect (so overlay updates propagate) but only the
+    // active one is rendered / scroll-observed.
+    val postsItems = viewModel.postsTab.collectAsLazyPagingItems()
+    val notesItems = viewModel.notesTab.collectAsLazyPagingItems()
+    val articlesItems = viewModel.articlesTab.collectAsLazyPagingItems()
+    val activeItems = when (uiState.selectedTab) {
+        ProfileTab.POSTS -> postsItems
+        ProfileTab.NOTES -> notesItems
+        ProfileTab.ARTICLES -> articlesItems
     }
 
     if (uiState.actionError != null) {
@@ -137,7 +136,8 @@ fun ProfileScreen(
                     if (uiState.actor != null) {
                         IconButton(onClick = {
                             val profileHandle = uiState.actor!!.handle
-                            val normalizedHandle = if (profileHandle.startsWith("@")) profileHandle else "@$profileHandle"
+                            val normalizedHandle =
+                                if (profileHandle.startsWith("@")) profileHandle else "@$profileHandle"
                             val profileUrl = "https://hackers.pub/$normalizedHandle"
                             val sendIntent = Intent().apply {
                                 action = Intent.ACTION_SEND
@@ -176,16 +176,21 @@ fun ProfileScreen(
                 uiState.isLoading && uiState.actor == null -> {
                     FullScreenLoading()
                 }
+
                 uiState.error != null && uiState.actor == null -> {
                     ErrorMessage(
                         message = uiState.error ?: stringResource(R.string.error_generic),
                         onRetry = { viewModel.loadProfile(handle) }
                     )
                 }
+
                 uiState.actor != null -> {
                     PullToRefreshBox(
                         isRefreshing = uiState.isRefreshing,
-                        onRefresh = { viewModel.refresh() }
+                        onRefresh = {
+                            viewModel.refresh()
+                            activeItems.refresh()
+                        }
                     ) {
                         LazyColumn(state = listState) {
                             item {
@@ -215,9 +220,10 @@ fun ProfileScreen(
                             }
 
                             items(
-                                items = uiState.posts,
-                                key = { it.id }
-                            ) { post ->
+                                count = activeItems.itemCount,
+                                key = activeItems.itemKey { it.id }
+                            ) { index ->
+                                val post = activeItems[index] ?: return@items
                                 PostCard(
                                     post = post,
                                     onClick = { onPostClick(post.sharedPost?.id ?: post.id) },
@@ -242,7 +248,12 @@ fun ProfileScreen(
                                                 putExtra(Intent.EXTRA_TEXT, shareUrl)
                                                 type = "text/plain"
                                             }
-                                            context.startActivity(Intent.createChooser(sendIntent, null))
+                                            context.startActivity(
+                                                Intent.createChooser(
+                                                    sendIntent,
+                                                    null
+                                                )
+                                            )
                                         }
                                     },
                                     onQuotedPostClick = onPostClick
@@ -254,10 +265,8 @@ fun ProfileScreen(
                                 )
                             }
 
-                            if (uiState.isLoadingMore) {
-                                item {
-                                    LoadingItem()
-                                }
+                            if (activeItems.loadState.append is LoadState.Loading) {
+                                item { LoadingItem() }
                             }
                         }
                     }
