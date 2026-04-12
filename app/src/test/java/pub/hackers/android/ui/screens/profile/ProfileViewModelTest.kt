@@ -47,9 +47,6 @@ class ProfileViewModelTest {
         bio = "hello",
         fields = fields,
         accountLinks = accountLinks,
-        posts = emptyList(),
-        hasNextPage = false,
-        endCursor = null,
         isViewer = false,
         viewerFollows = viewerFollows,
         followsViewer = false,
@@ -57,7 +54,7 @@ class ProfileViewModelTest {
     )
 
     private fun stubLoadProfile(result: ProfileResult = sampleProfile()) {
-        coEvery { repository.getProfile(any(), any()) } returns Result.success(result)
+        coEvery { repository.getProfile(any()) } returns Result.success(result)
     }
 
     private fun newViewModel(): ProfileViewModel {
@@ -83,7 +80,7 @@ class ProfileViewModelTest {
 
     @Test
     fun `init failure stores error`() = runTest {
-        coEvery { repository.getProfile(any(), any()) } returns Result.failure(RuntimeException("404"))
+        coEvery { repository.getProfile(any()) } returns Result.failure(RuntimeException("404"))
         val vm = newViewModel()
         advanceUntilIdle()
 
@@ -252,7 +249,7 @@ class ProfileViewModelTest {
         advanceUntilIdle()
 
         // Initial load + refresh = 2 calls
-        coVerify(atLeast = 2) { repository.getProfile(any(), any()) }
+        coVerify(atLeast = 2) { repository.getProfile(any()) }
         assertEquals(false, vm.uiState.value.isRefreshing)
     }
 

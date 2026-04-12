@@ -368,11 +368,9 @@ class HackersPubRepository @Inject constructor(
         }
     }
 
-    suspend fun getProfile(handle: String, postsAfter: String? = null): Result<ProfileResult> {
+    suspend fun getProfile(handle: String): Result<ProfileResult> {
         return try {
-            val response = apolloClient.query(
-                ActorByHandleQuery(handle, Optional.presentIfNotNull(postsAfter))
-            ).execute()
+            val response = apolloClient.query(ActorByHandleQuery(handle)).execute()
 
             if (response.hasErrors()) {
                 Result.failure(
@@ -408,20 +406,6 @@ class HackersPubRepository @Inject constructor(
                                 verified = link.verified?.toString()
                             )
                         } ?: emptyList(),
-                        posts = actor.posts.edges.mapNotNull { edge ->
-                            val sharedPost = edge.node.sharedPost?.sharedPostFields?.toPost()
-                            edge.node.postFields.toPost(
-                                sharedPost = sharedPost,
-                                lastSharer = if (sharedPost != null) Actor(
-                                    id = actor.id,
-                                    name = actor.name?.toString(),
-                                    handle = actor.handle,
-                                    avatarUrl = actor.avatarUrl.toString()
-                                ) else null
-                            )
-                        },
-                        hasNextPage = actor.posts.pageInfo.hasNextPage,
-                        endCursor = actor.posts.pageInfo.endCursor,
                         isViewer = actor.isViewer,
                         viewerFollows = actor.viewerFollows,
                         followsViewer = actor.followsViewer,
