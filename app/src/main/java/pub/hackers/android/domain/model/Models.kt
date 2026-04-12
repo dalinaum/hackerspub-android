@@ -174,6 +174,18 @@ data class Account(
     val handle: String
 )
 
+data class Passkey(
+    val id: String,
+    val name: String,
+    val created: String,
+    val lastUsed: String?
+)
+
+data class PasskeyRegistrationResult(
+    val verified: Boolean,
+    val passkey: Passkey?
+)
+
 data class TimelineResult(
     val posts: List<Post>,
     val hasNextPage: Boolean,

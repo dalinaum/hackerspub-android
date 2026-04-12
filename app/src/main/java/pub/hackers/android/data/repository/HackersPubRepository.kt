@@ -11,8 +11,11 @@ import pub.hackers.android.graphql.BlockActorMutation
 import pub.hackers.android.graphql.CompleteLoginChallengeMutation
 import pub.hackers.android.graphql.CreateNoteMutation
 import pub.hackers.android.graphql.DeletePostMutation
+import pub.hackers.android.graphql.GetPasskeyAuthenticationOptionsMutation
+import pub.hackers.android.graphql.GetPasskeyRegistrationOptionsMutation
 import pub.hackers.android.graphql.FollowActorMutation
 import pub.hackers.android.graphql.LocalTimelineQuery
+import pub.hackers.android.graphql.LoginByPasskeyMutation
 import pub.hackers.android.graphql.LoginByUsernameMutation
 import pub.hackers.android.graphql.NotificationsQuery
 import pub.hackers.android.graphql.PersonalTimelineQuery
@@ -22,7 +25,10 @@ import pub.hackers.android.graphql.PostDetailQuery
 import pub.hackers.android.graphql.PublicTimelineQuery
 import pub.hackers.android.graphql.RemoveFollowerMutation
 import pub.hackers.android.graphql.RemoveReactionFromPostMutation
+import pub.hackers.android.graphql.RevokePasskeyMutation
 import pub.hackers.android.graphql.RevokeSessionMutation
+import pub.hackers.android.graphql.ViewerPasskeysQuery
+import pub.hackers.android.graphql.VerifyPasskeyRegistrationMutation
 import pub.hackers.android.graphql.SearchActorsByHandleQuery
 import pub.hackers.android.graphql.SearchObjectQuery
 import pub.hackers.android.graphql.SearchPostQuery
@@ -352,6 +358,167 @@ class HackersPubRepository @Inject constructor(
                         )
                     )
                 )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPasskeyAuthenticationOptions(sessionId: String): Result<String> {
+        return try {
+            val response = apolloClient.mutation(
+                GetPasskeyAuthenticationOptionsMutation(sessionId = sessionId)
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val options = response.data?.getPasskeyAuthenticationOptions
+                    ?: return Result.failure(Exception("Failed to get passkey options"))
+                Result.success(toJsonString(options))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun loginByPasskey(sessionId: String, authenticationResponse: Any): Result<Session> {
+        return try {
+            val response = apolloClient.mutation(
+                LoginByPasskeyMutation(
+                    sessionId = sessionId,
+                    authenticationResponse = authenticationResponse,
+                    platform = Optional.present("android")
+                )
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val session = response.data?.loginByPasskey
+                    ?: return Result.failure(Exception("Passkey authentication failed"))
+
+                Result.success(
+                    Session(
+                        id = session.id.toString(),
+                        account = Account(
+                            id = session.account.id,
+                            username = session.account.username,
+                            name = session.account.name,
+                            avatarUrl = session.account.avatarUrl.toString(),
+                            handle = session.account.handle
+                        )
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPasskeyRegistrationOptions(accountId: String): Result<String> {
+        return try {
+            val response = apolloClient.mutation(
+                GetPasskeyRegistrationOptionsMutation(accountId = accountId)
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val options = response.data?.getPasskeyRegistrationOptions
+                    ?: return Result.failure(Exception("Failed to get registration options"))
+                Result.success(toJsonString(options))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun verifyPasskeyRegistration(
+        accountId: String,
+        name: String,
+        registrationResponse: Any
+    ): Result<PasskeyRegistrationResult> {
+        return try {
+            val response = apolloClient.mutation(
+                VerifyPasskeyRegistrationMutation(
+                    accountId = accountId,
+                    name = name,
+                    registrationResponse = registrationResponse,
+                    platform = Optional.present("android")
+                )
+            ).execute()
+
+            if (response.hasErrors()) {
+                val errors = response.errors?.map { "${it.message} path=${it.path}" }
+                android.util.Log.e("PasskeyAuth", "verifyPasskeyRegistration errors: $errors")
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val result = response.data?.verifyPasskeyRegistration
+                    ?: return Result.failure(Exception("Registration verification failed"))
+
+                Result.success(
+                    PasskeyRegistrationResult(
+                        verified = result.verified,
+                        passkey = result.passkey?.let {
+                            Passkey(
+                                id = it.id,
+                                name = it.name,
+                                created = it.created.toString(),
+                                lastUsed = it.lastUsed?.toString()
+                            )
+                        }
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun revokePasskey(passkeyId: String): Result<String?> {
+        return try {
+            val response = apolloClient.mutation(
+                RevokePasskeyMutation(passkeyId = passkeyId)
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                Result.success(response.data?.revokePasskey)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    data class PasskeysResult(
+        val accountId: String,
+        val passkeys: List<Passkey>
+    )
+
+    suspend fun getPasskeys(): Result<PasskeysResult> {
+        return try {
+            val response = apolloClient.query(ViewerPasskeysQuery())
+                .fetchPolicy(FetchPolicy.NetworkOnly)
+                .execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val viewer = response.data?.viewer
+                    ?: return Result.failure(Exception("Not authenticated"))
+
+                val passkeys = viewer.passkeys.edges.map { edge ->
+                    Passkey(
+                        id = edge.node.id,
+                        name = edge.node.name,
+                        created = edge.node.created.toString(),
+                        lastUsed = edge.node.lastUsed?.toString()
+                    )
+                }
+
+                Result.success(PasskeysResult(accountId = viewer.id, passkeys = passkeys))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -938,6 +1105,39 @@ class HackersPubRepository @Inject constructor(
             GqlPostVisibility.DIRECT -> PostVisibility.DIRECT
             GqlPostVisibility.NONE -> PostVisibility.NONE
             else -> PostVisibility.PUBLIC
+        }
+    }
+
+    private fun toJsonString(obj: Any?): String {
+        return when (obj) {
+            is Map<*, *> -> {
+                val jsonObj = org.json.JSONObject()
+                obj.forEach { (k, v) -> jsonObj.put(k.toString(), toJsonValue(v)) }
+                jsonObj.toString()
+            }
+            is List<*> -> {
+                val jsonArr = org.json.JSONArray()
+                obj.forEach { jsonArr.put(toJsonValue(it)) }
+                jsonArr.toString()
+            }
+            else -> obj.toString()
+        }
+    }
+
+    private fun toJsonValue(value: Any?): Any? {
+        return when (value) {
+            null -> org.json.JSONObject.NULL
+            is Map<*, *> -> {
+                val jsonObj = org.json.JSONObject()
+                value.forEach { (k, v) -> jsonObj.put(k.toString(), toJsonValue(v)) }
+                jsonObj
+            }
+            is List<*> -> {
+                val jsonArr = org.json.JSONArray()
+                value.forEach { jsonArr.put(toJsonValue(it)) }
+                jsonArr
+            }
+            else -> value
         }
     }
 }
