@@ -4,7 +4,31 @@ import com.apollographql.apollo.ApolloClient
 import com.apollographql.apollo.api.Optional
 import com.apollographql.apollo.cache.normalized.FetchPolicy
 import com.apollographql.apollo.cache.normalized.fetchPolicy
-import pub.hackers.android.domain.model.*
+import pub.hackers.android.domain.model.Account
+import pub.hackers.android.domain.model.AccountLink
+import pub.hackers.android.domain.model.Actor
+import pub.hackers.android.domain.model.ActorField
+import pub.hackers.android.domain.model.CustomEmoji
+import pub.hackers.android.domain.model.EngagementStats
+import pub.hackers.android.domain.model.LoginChallenge
+import pub.hackers.android.domain.model.Media
+import pub.hackers.android.domain.model.Notification
+import pub.hackers.android.domain.model.NotificationPost
+import pub.hackers.android.domain.model.NotificationsResult
+import pub.hackers.android.domain.model.Passkey
+import pub.hackers.android.domain.model.PasskeyRegistrationResult
+import pub.hackers.android.domain.model.Post
+import pub.hackers.android.domain.model.PostDetailResult
+import pub.hackers.android.domain.model.PostLink
+import pub.hackers.android.domain.model.PostLinkImage
+import pub.hackers.android.domain.model.PostVisibility
+import pub.hackers.android.domain.model.ProfileResult
+import pub.hackers.android.domain.model.QuotesResult
+import pub.hackers.android.domain.model.ReactionGroup
+import pub.hackers.android.domain.model.Session
+import pub.hackers.android.domain.model.SharesResult
+import pub.hackers.android.domain.model.TimelineResult
+import pub.hackers.android.domain.model.Viewer
 import pub.hackers.android.graphql.ActorArticlesQuery
 import pub.hackers.android.graphql.ActorByHandleQuery
 import pub.hackers.android.graphql.ActorNotesQuery
@@ -13,24 +37,23 @@ import pub.hackers.android.graphql.BlockActorMutation
 import pub.hackers.android.graphql.CompleteLoginChallengeMutation
 import pub.hackers.android.graphql.CreateNoteMutation
 import pub.hackers.android.graphql.DeletePostMutation
+import pub.hackers.android.graphql.FollowActorMutation
 import pub.hackers.android.graphql.GetPasskeyAuthenticationOptionsMutation
 import pub.hackers.android.graphql.GetPasskeyRegistrationOptionsMutation
-import pub.hackers.android.graphql.FollowActorMutation
 import pub.hackers.android.graphql.LocalTimelineQuery
 import pub.hackers.android.graphql.LoginByPasskeyMutation
 import pub.hackers.android.graphql.LoginByUsernameMutation
 import pub.hackers.android.graphql.NotificationsQuery
 import pub.hackers.android.graphql.PersonalTimelineQuery
-import pub.hackers.android.graphql.PostQuotesQuery
-import pub.hackers.android.graphql.PostSharesQuery
 import pub.hackers.android.graphql.PostDetailQuery
+import pub.hackers.android.graphql.PostQuotesQuery
+import pub.hackers.android.graphql.PostRepliesQuery
+import pub.hackers.android.graphql.PostSharesQuery
 import pub.hackers.android.graphql.PublicTimelineQuery
 import pub.hackers.android.graphql.RemoveFollowerMutation
 import pub.hackers.android.graphql.RemoveReactionFromPostMutation
 import pub.hackers.android.graphql.RevokePasskeyMutation
 import pub.hackers.android.graphql.RevokeSessionMutation
-import pub.hackers.android.graphql.ViewerPasskeysQuery
-import pub.hackers.android.graphql.VerifyPasskeyRegistrationMutation
 import pub.hackers.android.graphql.SearchActorsByHandleQuery
 import pub.hackers.android.graphql.SearchObjectQuery
 import pub.hackers.android.graphql.SearchPostQuery
@@ -38,29 +61,38 @@ import pub.hackers.android.graphql.SharePostMutation
 import pub.hackers.android.graphql.UnblockActorMutation
 import pub.hackers.android.graphql.UnfollowActorMutation
 import pub.hackers.android.graphql.UnsharePostMutation
+import pub.hackers.android.graphql.VerifyPasskeyRegistrationMutation
+import pub.hackers.android.graphql.ViewerPasskeysQuery
 import pub.hackers.android.graphql.ViewerQuery
 import pub.hackers.android.graphql.fragment.ActorFields
 import pub.hackers.android.graphql.fragment.EngagementStatsFields
 import pub.hackers.android.graphql.fragment.MediaFields
 import pub.hackers.android.graphql.fragment.PostFields
 import pub.hackers.android.graphql.fragment.SharedPostFields
-import pub.hackers.android.graphql.type.PostVisibility as GqlPostVisibility
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import pub.hackers.android.graphql.type.PostVisibility as GqlPostVisibility
 
 @Singleton
 class HackersPubRepository @Inject constructor(
     private val apolloClient: ApolloClient
 ) {
-    suspend fun getPublicTimeline(after: String? = null, refresh: Boolean = false): Result<TimelineResult> {
+    suspend fun getPublicTimeline(
+        after: String? = null,
+        refresh: Boolean = false
+    ): Result<TimelineResult> {
         return try {
             val response = apolloClient.query(PublicTimelineQuery(Optional.presentIfNotNull(after)))
                 .apply { if (refresh) fetchPolicy(FetchPolicy.NetworkOnly) }
                 .execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val data = response.data?.publicTimeline
                 Result.success(
@@ -78,14 +110,21 @@ class HackersPubRepository @Inject constructor(
         }
     }
 
-    suspend fun getLocalTimeline(after: String? = null, refresh: Boolean = false): Result<TimelineResult> {
+    suspend fun getLocalTimeline(
+        after: String? = null,
+        refresh: Boolean = false
+    ): Result<TimelineResult> {
         return try {
             val response = apolloClient.query(LocalTimelineQuery(Optional.presentIfNotNull(after)))
                 .apply { if (refresh) fetchPolicy(FetchPolicy.NetworkOnly) }
                 .execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val data = response.data?.publicTimeline
                 Result.success(
@@ -103,14 +142,22 @@ class HackersPubRepository @Inject constructor(
         }
     }
 
-    suspend fun getPersonalTimeline(after: String? = null, refresh: Boolean = false): Result<TimelineResult> {
+    suspend fun getPersonalTimeline(
+        after: String? = null,
+        refresh: Boolean = false
+    ): Result<TimelineResult> {
         return try {
-            val response = apolloClient.query(PersonalTimelineQuery(Optional.presentIfNotNull(after)))
-                .apply { if (refresh) fetchPolicy(FetchPolicy.NetworkOnly) }
-                .execute()
+            val response =
+                apolloClient.query(PersonalTimelineQuery(Optional.presentIfNotNull(after)))
+                    .apply { if (refresh) fetchPolicy(FetchPolicy.NetworkOnly) }
+                    .execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val data = response.data?.personalTimeline
                 Result.success(
@@ -134,14 +181,21 @@ class HackersPubRepository @Inject constructor(
         }
     }
 
-    suspend fun getNotifications(after: String? = null, refresh: Boolean = false): Result<NotificationsResult> {
+    suspend fun getNotifications(
+        after: String? = null,
+        refresh: Boolean = false
+    ): Result<NotificationsResult> {
         return try {
             val response = apolloClient.query(NotificationsQuery(Optional.presentIfNotNull(after)))
                 .apply { if (refresh) fetchPolicy(FetchPolicy.NetworkOnly) }
                 .execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val data = response.data?.viewer?.notifications
                 Result.success(
@@ -164,7 +218,11 @@ class HackersPubRepository @Inject constructor(
             val response = apolloClient.query(SearchPostQuery(query)).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val posts = response.data?.searchPost?.edges?.mapNotNull { edge ->
                     edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
@@ -183,7 +241,11 @@ class HackersPubRepository @Inject constructor(
             ).fetchPolicy(FetchPolicy.NetworkOnly).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val node = response.data?.node?.onPost
                     ?: return Result.failure(Exception("Post not found"))
@@ -205,6 +267,7 @@ class HackersPubRepository @Inject constructor(
                             },
                             viewerHasReacted = group.onEmojiReactionGroup.reactors.viewerHasReacted
                         )
+
                         group.onCustomEmojiReactionGroup != null -> ReactionGroup(
                             emoji = null,
                             customEmoji = CustomEmoji(
@@ -218,6 +281,7 @@ class HackersPubRepository @Inject constructor(
                             },
                             viewerHasReacted = group.onCustomEmojiReactionGroup.reactors.viewerHasReacted
                         )
+
                         else -> null
                     }
                 }
@@ -241,6 +305,37 @@ class HackersPubRepository @Inject constructor(
         }
     }
 
+    suspend fun getPostReplies(postId: String, after: String? = null): Result<TimelineResult> {
+        return try {
+            val response = apolloClient.query(
+                PostRepliesQuery(postId, Optional.presentIfNotNull(after))
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
+            } else {
+                val replies = response.data?.node?.onPost?.replies
+                    ?: return Result.failure(Exception("Post not found"))
+
+                Result.success(
+                    TimelineResult(
+                        posts = replies.edges.mapNotNull { edge ->
+                            edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
+                        },
+                        hasNextPage = replies.pageInfo.hasNextPage,
+                        endCursor = replies.pageInfo.endCursor
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun getProfile(handle: String, postsAfter: String? = null): Result<ProfileResult> {
         return try {
             val response = apolloClient.query(
@@ -248,7 +343,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val actor = response.data?.actorByHandle
                     ?: return Result.failure(Exception("Actor not found"))
@@ -310,7 +409,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val articles = response.data?.actorByHandle?.articles
                     ?: return Result.failure(Exception("Actor not found"))
@@ -337,7 +440,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val notes = response.data?.actorByHandle?.notes
                     ?: return Result.failure(Exception("Actor not found"))
@@ -364,7 +471,11 @@ class HackersPubRepository @Inject constructor(
                 .execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val viewer = response.data?.viewer
                 Result.success(
@@ -396,16 +507,22 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.loginByUsername
                 when {
                     result?.onLoginChallenge != null -> {
                         Result.success(LoginChallenge(result.onLoginChallenge.token.toString()))
                     }
+
                     result?.onAccountNotFoundError != null -> {
                         Result.failure(Exception("Account not found: ${result.onAccountNotFoundError.query}"))
                     }
+
                     else -> Result.failure(Exception("Unknown login result"))
                 }
             }
@@ -421,7 +538,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val session = response.data?.completeLoginChallenge
                     ?: return Result.failure(Exception("Invalid verification code"))
@@ -451,7 +572,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val options = response.data?.getPasskeyAuthenticationOptions
                     ?: return Result.failure(Exception("Failed to get passkey options"))
@@ -473,7 +598,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val session = response.data?.loginByPasskey
                     ?: return Result.failure(Exception("Passkey authentication failed"))
@@ -503,7 +632,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val options = response.data?.getPasskeyRegistrationOptions
                     ?: return Result.failure(Exception("Failed to get registration options"))
@@ -532,7 +665,11 @@ class HackersPubRepository @Inject constructor(
             if (response.hasErrors()) {
                 val errors = response.errors?.map { "${it.message} path=${it.path}" }
                 android.util.Log.e("PasskeyAuth", "verifyPasskeyRegistration errors: $errors")
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.verifyPasskeyRegistration
                     ?: return Result.failure(Exception("Registration verification failed"))
@@ -563,7 +700,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 Result.success(response.data?.revokePasskey)
             }
@@ -584,7 +725,11 @@ class HackersPubRepository @Inject constructor(
                 .execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val viewer = response.data?.viewer
                     ?: return Result.failure(Exception("Not authenticated"))
@@ -632,7 +777,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.createNote
                 when {
@@ -656,12 +805,15 @@ class HackersPubRepository @Inject constructor(
                             )
                         )
                     }
+
                     result?.onInvalidInputError != null -> {
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
                     }
+
                     result?.onNotAuthenticatedError != null -> {
                         Result.failure(Exception("Not authenticated"))
                     }
+
                     else -> Result.failure(Exception("Unknown error"))
                 }
             }
@@ -675,7 +827,11 @@ class HackersPubRepository @Inject constructor(
             val response = apolloClient.mutation(SharePostMutation(postId)).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.sharePost
                 when {
@@ -683,9 +839,11 @@ class HackersPubRepository @Inject constructor(
                     result?.onInvalidInputError != null -> {
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
                     }
+
                     result?.onNotAuthenticatedError != null -> {
                         Result.failure(Exception("Not authenticated"))
                     }
+
                     else -> Result.failure(Exception("Unknown error"))
                 }
             }
@@ -699,7 +857,11 @@ class HackersPubRepository @Inject constructor(
             val response = apolloClient.mutation(UnsharePostMutation(postId)).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.unsharePost
                 when {
@@ -707,9 +869,11 @@ class HackersPubRepository @Inject constructor(
                     result?.onInvalidInputError != null -> {
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
                     }
+
                     result?.onNotAuthenticatedError != null -> {
                         Result.failure(Exception("Not authenticated"))
                     }
+
                     else -> Result.failure(Exception("Unknown error"))
                 }
             }
@@ -723,7 +887,11 @@ class HackersPubRepository @Inject constructor(
             val response = apolloClient.mutation(RevokeSessionMutation(sessionId)).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 Result.success(Unit)
             }
@@ -739,7 +907,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val actors = response.data?.searchActorsByHandle?.map { actor ->
                     Actor(
@@ -760,15 +932,21 @@ class HackersPubRepository @Inject constructor(
         return try {
             val response = apolloClient.mutation(FollowActorMutation(actorId)).execute()
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.followActor
                 when {
                     result?.onFollowActorPayload != null -> Result.success(Unit)
                     result?.onInvalidInputError != null ->
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+
                     result?.onNotAuthenticatedError != null ->
                         Result.failure(Exception("Not authenticated"))
+
                     else -> Result.failure(Exception("Unknown error"))
                 }
             }
@@ -781,15 +959,21 @@ class HackersPubRepository @Inject constructor(
         return try {
             val response = apolloClient.mutation(UnfollowActorMutation(actorId)).execute()
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.unfollowActor
                 when {
                     result?.onUnfollowActorPayload != null -> Result.success(Unit)
                     result?.onInvalidInputError != null ->
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+
                     result?.onNotAuthenticatedError != null ->
                         Result.failure(Exception("Not authenticated"))
+
                     else -> Result.failure(Exception("Unknown error"))
                 }
             }
@@ -802,15 +986,21 @@ class HackersPubRepository @Inject constructor(
         return try {
             val response = apolloClient.mutation(BlockActorMutation(actorId)).execute()
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.blockActor
                 when {
                     result?.onBlockActorPayload != null -> Result.success(Unit)
                     result?.onInvalidInputError != null ->
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+
                     result?.onNotAuthenticatedError != null ->
                         Result.failure(Exception("Not authenticated"))
+
                     else -> Result.failure(Exception("Unknown error"))
                 }
             }
@@ -823,15 +1013,21 @@ class HackersPubRepository @Inject constructor(
         return try {
             val response = apolloClient.mutation(UnblockActorMutation(actorId)).execute()
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.unblockActor
                 when {
                     result?.onUnblockActorPayload != null -> Result.success(Unit)
                     result?.onInvalidInputError != null ->
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+
                     result?.onNotAuthenticatedError != null ->
                         Result.failure(Exception("Not authenticated"))
+
                     else -> Result.failure(Exception("Unknown error"))
                 }
             }
@@ -844,15 +1040,21 @@ class HackersPubRepository @Inject constructor(
         return try {
             val response = apolloClient.mutation(RemoveFollowerMutation(actorId)).execute()
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.removeFollower
                 when {
                     result?.onRemoveFollowerPayload != null -> Result.success(Unit)
                     result?.onInvalidInputError != null ->
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+
                     result?.onNotAuthenticatedError != null ->
                         Result.failure(Exception("Not authenticated"))
+
                     else -> Result.failure(Exception("Unknown error"))
                 }
             }
@@ -865,7 +1067,11 @@ class HackersPubRepository @Inject constructor(
         return try {
             val response = apolloClient.query(SearchObjectQuery(query)).execute()
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val url = response.data?.searchObject?.onSearchedObject?.url
                 Result.success(url)
@@ -882,7 +1088,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val shares = response.data?.node?.onPost?.shares
                     ?: return Result.failure(Exception("Post not found"))
@@ -909,7 +1119,11 @@ class HackersPubRepository @Inject constructor(
             ).execute()
 
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val quotes = response.data?.node?.onPost?.quotes
                     ?: return Result.failure(Exception("Post not found"))
@@ -935,15 +1149,21 @@ class HackersPubRepository @Inject constructor(
                 AddReactionToPostMutation(postId = postId, emoji = emoji)
             ).execute()
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.addReactionToPost
                 when {
                     result?.onAddReactionToPostPayload != null -> Result.success(Unit)
                     result?.onInvalidInputError != null ->
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+
                     result?.onNotAuthenticatedError != null ->
                         Result.failure(Exception("Not authenticated"))
+
                     else -> Result.failure(Exception("Unknown error"))
                 }
             }
@@ -958,15 +1178,21 @@ class HackersPubRepository @Inject constructor(
                 RemoveReactionFromPostMutation(postId = postId, emoji = emoji)
             ).execute()
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.removeReactionFromPost
                 when {
                     result?.onRemoveReactionFromPostPayload != null -> Result.success(Unit)
                     result?.onInvalidInputError != null ->
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+
                     result?.onNotAuthenticatedError != null ->
                         Result.failure(Exception("Not authenticated"))
+
                     else -> Result.failure(Exception("Unknown error"))
                 }
             }
@@ -979,17 +1205,24 @@ class HackersPubRepository @Inject constructor(
         return try {
             val response = apolloClient.mutation(DeletePostMutation(postId)).execute()
             if (response.hasErrors()) {
-                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+                Result.failure(
+                    Exception(
+                        response.errors?.firstOrNull()?.message ?: "Unknown error"
+                    )
+                )
             } else {
                 val result = response.data?.deletePost
                 when {
                     result?.onDeletePostPayload != null -> Result.success(Unit)
                     result?.onInvalidInputError != null ->
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
+
                     result?.onNotAuthenticatedError != null ->
                         Result.failure(Exception("Not authenticated"))
+
                     result?.onSharedPostDeletionNotAllowedError != null ->
                         Result.failure(Exception("Cannot delete a shared post"))
+
                     else -> Result.failure(Exception("Unknown error"))
                 }
             }
@@ -1054,6 +1287,7 @@ class HackersPubRepository @Inject constructor(
                         reactors = emptyList(),
                         viewerHasReacted = group.onEmojiReactionGroup.reactors.viewerHasReacted
                     )
+
                     group.onCustomEmojiReactionGroup != null -> ReactionGroup(
                         emoji = null,
                         customEmoji = CustomEmoji(
@@ -1065,6 +1299,7 @@ class HackersPubRepository @Inject constructor(
                         reactors = emptyList(),
                         viewerHasReacted = group.onCustomEmojiReactionGroup.reactors.viewerHasReacted
                     )
+
                     else -> null
                 }
             }
@@ -1130,34 +1365,59 @@ class HackersPubRepository @Inject constructor(
                 created = created,
                 actors = actors
             )
+
             onMentionNotification != null -> Notification.Mention(
                 id = id,
                 uuid = uuid.toString(),
                 created = created,
                 actors = actors,
-                post = onMentionNotification.post?.let { NotificationPost(id = it.id, content = it.content.toString()) }
+                post = onMentionNotification.post?.let {
+                    NotificationPost(
+                        id = it.id,
+                        content = it.content.toString()
+                    )
+                }
             )
+
             onReplyNotification != null -> Notification.Reply(
                 id = id,
                 uuid = uuid.toString(),
                 created = created,
                 actors = actors,
-                post = onReplyNotification.post?.let { NotificationPost(id = it.id, content = it.content.toString()) }
+                post = onReplyNotification.post?.let {
+                    NotificationPost(
+                        id = it.id,
+                        content = it.content.toString()
+                    )
+                }
             )
+
             onQuoteNotification != null -> Notification.Quote(
                 id = id,
                 uuid = uuid.toString(),
                 created = created,
                 actors = actors,
-                post = onQuoteNotification.post?.let { NotificationPost(id = it.id, content = it.content.toString()) }
+                post = onQuoteNotification.post?.let {
+                    NotificationPost(
+                        id = it.id,
+                        content = it.content.toString()
+                    )
+                }
             )
+
             onShareNotification != null -> Notification.Share(
                 id = id,
                 uuid = uuid.toString(),
                 created = created,
                 actors = actors,
-                post = onShareNotification.post?.let { NotificationPost(id = it.id, content = it.content.toString()) }
+                post = onShareNotification.post?.let {
+                    NotificationPost(
+                        id = it.id,
+                        content = it.content.toString()
+                    )
+                }
             )
+
             onReactNotification != null -> Notification.React(
                 id = id,
                 uuid = uuid.toString(),
@@ -1171,8 +1431,14 @@ class HackersPubRepository @Inject constructor(
                         imageUrl = it.imageUrl
                     )
                 },
-                post = onReactNotification.post?.let { NotificationPost(id = it.id, content = it.content.toString()) }
+                post = onReactNotification.post?.let {
+                    NotificationPost(
+                        id = it.id,
+                        content = it.content.toString()
+                    )
+                }
             )
+
             else -> null
         }
     }
@@ -1195,11 +1461,13 @@ class HackersPubRepository @Inject constructor(
                 obj.forEach { (k, v) -> jsonObj.put(k.toString(), toJsonValue(v)) }
                 jsonObj.toString()
             }
+
             is List<*> -> {
                 val jsonArr = org.json.JSONArray()
                 obj.forEach { jsonArr.put(toJsonValue(it)) }
                 jsonArr.toString()
             }
+
             else -> obj.toString()
         }
     }
@@ -1212,11 +1480,13 @@ class HackersPubRepository @Inject constructor(
                 value.forEach { (k, v) -> jsonObj.put(k.toString(), toJsonValue(v)) }
                 jsonObj
             }
+
             is List<*> -> {
                 val jsonArr = org.json.JSONArray()
                 value.forEach { jsonArr.put(toJsonValue(it)) }
                 jsonArr
             }
+
             else -> value
         }
     }

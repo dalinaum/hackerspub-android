@@ -429,6 +429,28 @@ query PostDetail($id: ID!, $repliesAfter: String) {
     }
 }
 
+query PostReplies($id: ID!, $after: String) {
+    node(id: $id) {
+        ... on Post {
+            replies(first: 20, after: $after) {
+                edges {
+                    cursor
+                    node {
+                        ...PostFields
+                        sharedPost {
+                            ...SharedPostFields
+                        }
+                    }
+                }
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+            }
+        }
+    }
+}
+
 mutation LoginByUsername($username: String!, $locale: Locale!, $verifyUrl: URITemplate!) {
     loginByUsername(username: $username, locale: $locale, verifyUrl: $verifyUrl) {
         ... on LoginChallenge {

@@ -74,6 +74,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import coil.compose.AsyncImage
 import pub.hackers.android.R
 import pub.hackers.android.domain.model.Post
@@ -120,7 +124,9 @@ fun PostDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val colors = LocalAppColors.current
-    val confirmBeforeDelete by viewModel.preferencesManager.confirmBeforeDelete.collectAsState(initial = true)
+    val confirmBeforeDelete by viewModel.preferencesManager.confirmBeforeDelete.collectAsState(
+        initial = true
+    )
     val confirmBeforeShare by viewModel.preferencesManager.confirmBeforeShare.collectAsState(initial = false)
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showShareConfirmation by remember { mutableStateOf(false) }
@@ -301,24 +307,27 @@ fun PostDetailScreen(
                 uiState.isLoading -> {
                     FullScreenLoading()
                 }
+
                 uiState.error != null -> {
                     ErrorMessage(
                         message = uiState.error ?: stringResource(R.string.error_generic),
                         onRetry = { viewModel.loadPost(postId) }
                     )
                 }
+
                 uiState.post != null -> {
+                    val replies = viewModel.replies.collectAsLazyPagingItems()
                     PullToRefreshBox(
                         isRefreshing = uiState.isRefreshing,
-                        onRefresh = { viewModel.refresh() }
+                        onRefresh = {
+                            viewModel.refresh()
+                            replies.refresh()
+                        }
                     ) {
                         PostDetailContent(
                             post = uiState.post!!,
                             reactionGroups = uiState.reactionGroups,
-                            replies = uiState.replies,
-                            hasMoreReplies = uiState.hasMoreReplies,
-                            isLoadingMoreReplies = uiState.isLoadingMoreReplies,
-                            onLoadMoreReplies = { viewModel.loadMoreReplies() },
+                            replies = replies,
                             onProfileClick = onProfileClick,
                             onPostClick = onPostClick,
                             onReplyClick = { onReplyClick(postId) },
@@ -406,10 +415,7 @@ private fun PostDetailActionMenu(
 private fun PostDetailContent(
     post: Post,
     reactionGroups: List<ReactionGroup>,
-    replies: List<Post>,
-    hasMoreReplies: Boolean = false,
-    isLoadingMoreReplies: Boolean = false,
-    onLoadMoreReplies: () -> Unit = {},
+    replies: LazyPagingItems<Post>,
     onProfileClick: (String) -> Unit,
     onPostClick: (String) -> Unit,
     onShareClick: () -> Unit,
@@ -560,7 +566,9 @@ private fun PostDetailContent(
 
                 if (!isTranslating && translationError == null) {
                     Text(
-                        text = if (showTranslated) stringResource(R.string.show_original) else stringResource(R.string.translate),
+                        text = if (showTranslated) stringResource(R.string.show_original) else stringResource(
+                            R.string.translate
+                        ),
                         style = typography.labelMedium,
                         color = colors.textSecondary,
                         modifier = Modifier
@@ -713,7 +721,10 @@ private fun PostDetailContent(
                                 modifier = Modifier.padding(end = 8.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.padding(
+                                        horizontal = 12.dp,
+                                        vertical = 6.dp
+                                    ),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     if (group.emoji != null) {
@@ -797,7 +808,7 @@ private fun PostDetailContent(
             }
         }
 
-        if (replies.isNotEmpty()) {
+        if (replies.itemCount > 0) {
             item {
                 Text(
                     text = stringResource(R.string.replies),
@@ -808,9 +819,10 @@ private fun PostDetailContent(
             }
 
             items(
-                items = replies,
-                key = { it.id }
-            ) { reply ->
+                count = replies.itemCount,
+                key = replies.itemKey { it.id }
+            ) { index ->
+                val reply = replies[index] ?: return@items
                 PostCard(
                     post = reply,
                     onClick = { onPostClick(reply.id) },
@@ -820,21 +832,8 @@ private fun PostDetailContent(
                 HorizontalDivider(thickness = 0.5.dp, color = colors.divider)
             }
 
-            if (isLoadingMoreReplies) {
-                item {
-                    LoadingItem()
-                }
-            } else if (hasMoreReplies) {
-                item {
-                    TextButton(
-                        onClick = onLoadMoreReplies,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp)
-                    ) {
-                        Text(stringResource(R.string.load_more))
-                    }
-                }
+            if (replies.loadState.append is LoadState.Loading) {
+                item { LoadingItem() }
             }
         }
     }

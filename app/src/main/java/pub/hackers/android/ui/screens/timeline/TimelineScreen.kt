@@ -1,5 +1,6 @@
 package pub.hackers.android.ui.screens.timeline
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -8,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -25,13 +25,8 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.flow.dropWhile
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,8 +34,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import android.content.Intent
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import coil.compose.AsyncImage
+import kotlinx.coroutines.flow.dropWhile
+import kotlinx.coroutines.flow.first
 import pub.hackers.android.R
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
@@ -64,49 +63,37 @@ fun TimelineScreen(
     viewModel: TimelineViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val items = viewModel.posts.collectAsLazyPagingItems()
     val listState = rememberLazyListState()
     val context = LocalContext.current
     val colors = LocalAppColors.current
-    val coroutineScope = rememberCoroutineScope()
 
+    // After composing a new post, refresh and scroll to top once refresh completes.
     LaunchedEffect(postedAt) {
         if (postedAt > 0L) {
-            viewModel.refresh()
-            // Wait for refresh to start then complete
-            viewModel.uiState
-                .dropWhile { !it.isRefreshing }
-                .first { !it.isRefreshing }
+            items.refresh()
+            snapshotFlow { items.loadState.refresh }
+                .dropWhile { it !is LoadState.Loading }
+                .first { it !is LoadState.Loading }
             listState.scrollToItem(0)
         }
     }
 
+    // Home tab re-tap: if at top, refresh; otherwise scroll to top.
     LaunchedEffect(tabRetapped) {
         if (tabRetapped > 0L) {
             if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
-                viewModel.refresh()
+                items.refresh()
             } else {
                 listState.animateScrollToItem(0)
             }
         }
     }
 
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-            lastVisibleItem != null && lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 3
-        }
-    }
-
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore && uiState.hasNextPage && !uiState.isLoadingMore) {
-            viewModel.loadMore()
-        }
-    }
-
-    // Reaction picker bottom sheet
+    // Reaction picker bottom sheet — look up the currently-loaded post by id.
     val pickerPostId = uiState.reactionPickerPostId
     if (pickerPostId != null) {
-        val pickerPost = uiState.posts.find {
+        val pickerPost = items.itemSnapshotList.items.find {
             it.id == pickerPostId || it.sharedPost?.id == pickerPostId
         }
         val targetPost = pickerPost?.sharedPost ?: pickerPost
@@ -117,7 +104,9 @@ fun TimelineScreen(
             ReactionPicker(
                 reactionGroups = targetPost?.reactionGroups ?: emptyList(),
                 isSubmitting = false,
-                onEmojiSelect = { emoji -> viewModel.toggleReaction(pickerPostId, emoji) },
+                onEmojiSelect = { emoji ->
+                    pickerPost?.let { viewModel.toggleReaction(it, emoji) }
+                },
                 onClose = { viewModel.hideReactionPicker() }
             )
         }
@@ -127,7 +116,6 @@ fun TimelineScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             LargeTitleHeader(title = stringResource(R.string.personal_timeline)) {
-                // Settings gear icon
                 Box(
                     modifier = Modifier
                         .size(28.dp)
@@ -143,7 +131,6 @@ fun TimelineScreen(
                     )
                 }
 
-                // User avatar (if logged in)
                 if (userAvatarUrl != null) {
                     AsyncImage(
                         model = userAvatarUrl,
@@ -173,38 +160,43 @@ fun TimelineScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            val refresh = items.loadState.refresh
             when {
-                uiState.isLoading && uiState.posts.isEmpty() -> {
+                refresh is LoadState.Loading && items.itemCount == 0 -> {
                     FullScreenLoading()
                 }
-                uiState.error != null && uiState.posts.isEmpty() -> {
+
+                refresh is LoadState.Error && items.itemCount == 0 -> {
                     ErrorMessage(
-                        message = uiState.error ?: stringResource(R.string.error_generic),
-                        onRetry = { viewModel.refresh() }
+                        message = refresh.error.message ?: stringResource(R.string.error_generic),
+                        onRetry = { items.refresh() }
                     )
                 }
-                uiState.posts.isEmpty() -> {
-                    ErrorMessage(
-                        message = stringResource(R.string.no_posts)
-                    )
+
+                refresh is LoadState.NotLoading && items.itemCount == 0 -> {
+                    ErrorMessage(message = stringResource(R.string.no_posts))
                 }
+
                 else -> {
                     PullToRefreshBox(
-                        isRefreshing = uiState.isRefreshing,
-                        onRefresh = { viewModel.refresh() }
+                        isRefreshing = refresh is LoadState.Loading,
+                        onRefresh = { items.refresh() }
                     ) {
-                        LazyColumn(
-                            state = listState
-                        ) {
+                        LazyColumn(state = listState) {
                             items(
-                                items = uiState.posts,
-                                key = { it.id }
-                            ) { post ->
+                                count = items.itemCount,
+                                key = items.itemKey { it.id }
+                            ) { index ->
+                                val post = items[index] ?: return@items
                                 PostCard(
                                     post = post,
                                     onClick = { onPostClick(post.sharedPost?.id ?: post.id) },
                                     onProfileClick = onProfileClick,
-                                    onReplyClick = { onComposeClick(post.sharedPost?.id ?: post.id) },
+                                    onReplyClick = {
+                                        onComposeClick(
+                                            post.sharedPost?.id ?: post.id
+                                        )
+                                    },
                                     onShareClick = {
                                         if (post.viewerHasShared) {
                                             viewModel.unsharePost(post.id)
@@ -213,8 +205,10 @@ fun TimelineScreen(
                                         }
                                     },
                                     onQuoteClick = { onQuoteClick(post.sharedPost?.id ?: post.id) },
-                                    onReactionClick = { viewModel.toggleFavourite(post.sharedPost?.id ?: post.id) },
-                                    onReactionLongPress = { viewModel.showReactionPicker(post.sharedPost?.id ?: post.id) },
+                                    onReactionClick = { viewModel.toggleFavourite(post) },
+                                    onReactionLongPress = {
+                                        viewModel.showReactionPicker(post.sharedPost?.id ?: post.id)
+                                    },
                                     onExternalShareClick = {
                                         val displayPost = post.sharedPost ?: post
                                         val shareUrl = displayPost.url ?: displayPost.iri
@@ -224,7 +218,12 @@ fun TimelineScreen(
                                                 putExtra(Intent.EXTRA_TEXT, shareUrl)
                                                 type = "text/plain"
                                             }
-                                            context.startActivity(Intent.createChooser(sendIntent, null))
+                                            context.startActivity(
+                                                Intent.createChooser(
+                                                    sendIntent,
+                                                    null
+                                                )
+                                            )
                                         }
                                     },
                                     onQuotedPostClick = onPostClick
@@ -236,10 +235,8 @@ fun TimelineScreen(
                                 )
                             }
 
-                            if (uiState.isLoadingMore) {
-                                item {
-                                    LoadingItem()
-                                }
+                            if (items.loadState.append is LoadState.Loading) {
+                                item { LoadingItem() }
                             }
                         }
                     }

@@ -3,7 +3,10 @@ package pub.hackers.android.ui.screens.postdetail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,6 +15,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import pub.hackers.android.data.local.PreferencesManager
 import pub.hackers.android.data.local.SessionManager
+import pub.hackers.android.data.paging.cursorPager
+import pub.hackers.android.data.paging.postRepliesPage
 import pub.hackers.android.data.repository.HackersPubRepository
 import pub.hackers.android.domain.model.Actor
 import pub.hackers.android.domain.model.Post
@@ -21,12 +26,8 @@ import javax.inject.Inject
 data class PostDetailUiState(
     val post: Post? = null,
     val reactionGroups: List<ReactionGroup> = emptyList(),
-    val replies: List<Post> = emptyList(),
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
-    val isLoadingMoreReplies: Boolean = false,
-    val hasMoreReplies: Boolean = false,
-    val repliesEndCursor: String? = null,
     val error: String? = null,
     val canDelete: Boolean = false,
     val isDeleting: Boolean = false,
@@ -39,7 +40,7 @@ data class PostDetailUiState(
     val isLoadingShares: Boolean = false,
     val showQuotesSheet: Boolean = false,
     val quotePosts: List<Post> = emptyList(),
-    val isLoadingQuotes: Boolean = false
+    val isLoadingQuotes: Boolean = false,
 )
 
 @HiltViewModel
@@ -47,13 +48,19 @@ class PostDetailViewModel @Inject constructor(
     private val repository: HackersPubRepository,
     private val sessionManager: SessionManager,
     val preferencesManager: PreferencesManager,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val postId: String = checkNotNull(savedStateHandle["postId"])
 
     private val _uiState = MutableStateFlow(PostDetailUiState())
     val uiState: StateFlow<PostDetailUiState> = _uiState.asStateFlow()
+
+    // Replies are paginated independently of the main post payload.
+    val replies: Flow<PagingData<Post>> =
+        cursorPager { after -> repository.postRepliesPage(postId, after) }
+            .flow
+            .cachedIn(viewModelScope)
 
     init {
         loadPost(postId)
@@ -63,33 +70,23 @@ class PostDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            repository.getPostDetail(id)
-                .onSuccess { result ->
-                    val viewerHandle = sessionManager.userHandle.first()
-                    val canDelete = viewerHandle != null &&
+            repository.getPostDetail(id).onSuccess { result ->
+                val viewerHandle = sessionManager.userHandle.first()
+                val canDelete = viewerHandle != null &&
                         result.post.actor.handle.equals(viewerHandle, ignoreCase = true) &&
                         result.post.sharedPost == null
 
-                    _uiState.update {
-                        it.copy(
-                            post = result.post,
-                            reactionGroups = result.reactionGroups,
-                            replies = result.replies,
-                            hasMoreReplies = result.hasMoreReplies,
-                            repliesEndCursor = result.repliesEndCursor,
-                            isLoading = false,
-                            canDelete = canDelete
-                        )
-                    }
+                _uiState.update {
+                    it.copy(
+                        post = result.post,
+                        reactionGroups = result.reactionGroups,
+                        isLoading = false,
+                        canDelete = canDelete,
+                    )
                 }
-                .onFailure { error ->
-                    _uiState.update {
-                        it.copy(
-                            error = error.message,
-                            isLoading = false
-                        )
-                    }
-                }
+            }.onFailure { error ->
+                _uiState.update { it.copy(error = error.message, isLoading = false) }
+            }
         }
     }
 
@@ -97,92 +94,61 @@ class PostDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
 
-            repository.getPostDetail(postId)
-                .onSuccess { result ->
-                    val viewerHandle = sessionManager.userHandle.first()
-                    val canDelete = viewerHandle != null &&
+            repository.getPostDetail(postId).onSuccess { result ->
+                val viewerHandle = sessionManager.userHandle.first()
+                val canDelete = viewerHandle != null &&
                         result.post.actor.handle.equals(viewerHandle, ignoreCase = true) &&
                         result.post.sharedPost == null
 
-                    _uiState.update {
-                        it.copy(
-                            post = result.post,
-                            reactionGroups = result.reactionGroups,
-                            replies = result.replies,
-                            hasMoreReplies = result.hasMoreReplies,
-                            repliesEndCursor = result.repliesEndCursor,
-                            isRefreshing = false,
-                            canDelete = canDelete
-                        )
-                    }
+                _uiState.update {
+                    it.copy(
+                        post = result.post,
+                        reactionGroups = result.reactionGroups,
+                        isRefreshing = false,
+                        canDelete = canDelete,
+                    )
                 }
-                .onFailure {
-                    _uiState.update { it.copy(isRefreshing = false) }
-                }
-        }
-    }
-
-    fun loadMoreReplies() {
-        val state = _uiState.value
-        if (!state.hasMoreReplies || state.isLoadingMoreReplies) return
-
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingMoreReplies = true) }
-
-            repository.getPostDetail(postId, repliesAfter = state.repliesEndCursor)
-                .onSuccess { result ->
-                    _uiState.update {
-                        it.copy(
-                            replies = it.replies + result.replies,
-                            hasMoreReplies = result.hasMoreReplies,
-                            repliesEndCursor = result.repliesEndCursor,
-                            isLoadingMoreReplies = false
-                        )
-                    }
-                }
-                .onFailure {
-                    _uiState.update { it.copy(isLoadingMoreReplies = false) }
-                }
+            }.onFailure {
+                _uiState.update { it.copy(isRefreshing = false) }
+            }
         }
     }
 
     fun sharePost() {
         viewModelScope.launch {
-            repository.sharePost(postId)
-                .onSuccess {
-                    _uiState.update { state ->
-                        state.post?.let { post ->
-                            state.copy(
-                                post = post.copy(
-                                    viewerHasShared = true,
-                                    engagementStats = post.engagementStats.copy(
-                                        shares = post.engagementStats.shares + 1
-                                    )
-                                )
-                            )
-                        } ?: state
-                    }
+            repository.sharePost(postId).onSuccess {
+                _uiState.update { state ->
+                    state.post?.let { post ->
+                        state.copy(
+                            post = post.copy(
+                                viewerHasShared = true,
+                                engagementStats = post.engagementStats.copy(
+                                    shares = post.engagementStats.shares + 1,
+                                ),
+                            ),
+                        )
+                    } ?: state
                 }
+            }
         }
     }
 
     fun unsharePost() {
         viewModelScope.launch {
-            repository.unsharePost(postId)
-                .onSuccess {
-                    _uiState.update { state ->
-                        state.post?.let { post ->
-                            state.copy(
-                                post = post.copy(
-                                    viewerHasShared = false,
-                                    engagementStats = post.engagementStats.copy(
-                                        shares = maxOf(0, post.engagementStats.shares - 1)
-                                    )
-                                )
-                            )
-                        } ?: state
-                    }
+            repository.unsharePost(postId).onSuccess {
+                _uiState.update { state ->
+                    state.post?.let { post ->
+                        state.copy(
+                            post = post.copy(
+                                viewerHasShared = false,
+                                engagementStats = post.engagementStats.copy(
+                                    shares = maxOf(0, post.engagementStats.shares - 1),
+                                ),
+                            ),
+                        )
+                    } ?: state
                 }
+            }
         }
     }
 
@@ -192,15 +158,11 @@ class PostDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isDeleting = true, deleteError = null) }
 
-            repository.deletePost(postId)
-                .onSuccess {
-                    _uiState.update { it.copy(isDeleting = false, isDeleted = true) }
-                }
-                .onFailure { error ->
-                    _uiState.update {
-                        it.copy(isDeleting = false, deleteError = error.message)
-                    }
-                }
+            repository.deletePost(postId).onSuccess {
+                _uiState.update { it.copy(isDeleting = false, isDeleted = true) }
+            }.onFailure { error ->
+                _uiState.update { it.copy(isDeleting = false, deleteError = error.message) }
+            }
         }
     }
 
@@ -215,15 +177,11 @@ class PostDetailViewModel @Inject constructor(
     fun showSharesSheet() {
         _uiState.update { it.copy(showSharesSheet = true, isLoadingShares = true) }
         viewModelScope.launch {
-            repository.getPostShares(postId)
-                .onSuccess { result ->
-                    _uiState.update {
-                        it.copy(shareActors = result.actors, isLoadingShares = false)
-                    }
-                }
-                .onFailure {
-                    _uiState.update { it.copy(isLoadingShares = false) }
-                }
+            repository.getPostShares(postId).onSuccess { result ->
+                _uiState.update { it.copy(shareActors = result.actors, isLoadingShares = false) }
+            }.onFailure {
+                _uiState.update { it.copy(isLoadingShares = false) }
+            }
         }
     }
 
@@ -234,15 +192,11 @@ class PostDetailViewModel @Inject constructor(
     fun showQuotesSheet() {
         _uiState.update { it.copy(showQuotesSheet = true, isLoadingQuotes = true) }
         viewModelScope.launch {
-            repository.getPostQuotes(postId)
-                .onSuccess { result ->
-                    _uiState.update {
-                        it.copy(quotePosts = result.posts, isLoadingQuotes = false)
-                    }
-                }
-                .onFailure {
-                    _uiState.update { it.copy(isLoadingQuotes = false) }
-                }
+            repository.getPostQuotes(postId).onSuccess { result ->
+                _uiState.update { it.copy(quotePosts = result.posts, isLoadingQuotes = false) }
+            }.onFailure {
+                _uiState.update { it.copy(isLoadingQuotes = false) }
+            }
         }
     }
 
@@ -265,57 +219,51 @@ class PostDetailViewModel @Inject constructor(
                 repository.addReactionToPost(postId, emoji)
             }
 
-            result
-                .onSuccess {
-                    // Optimistically update local state
-                    _uiState.update { state ->
-                        val updatedGroups = if (viewerHasReacted) {
+            result.onSuccess {
+                _uiState.update { state ->
+                    val updatedGroups = if (viewerHasReacted) {
+                        state.reactionGroups.map { group ->
+                            if (group.emoji == emoji) {
+                                group.copy(
+                                    count = maxOf(0, group.count - 1),
+                                    viewerHasReacted = false,
+                                )
+                            } else group
+                        }.filter { it.count > 0 || it.viewerHasReacted }
+                    } else {
+                        val existing = state.reactionGroups.find { it.emoji == emoji }
+                        if (existing != null) {
                             state.reactionGroups.map { group ->
                                 if (group.emoji == emoji) {
-                                    group.copy(
-                                        count = maxOf(0, group.count - 1),
-                                        viewerHasReacted = false
-                                    )
+                                    group.copy(count = group.count + 1, viewerHasReacted = true)
                                 } else group
-                            }.filter { it.count > 0 || it.viewerHasReacted }
-                        } else {
-                            val existing = state.reactionGroups.find { it.emoji == emoji }
-                            if (existing != null) {
-                                state.reactionGroups.map { group ->
-                                    if (group.emoji == emoji) {
-                                        group.copy(
-                                            count = group.count + 1,
-                                            viewerHasReacted = true
-                                        )
-                                    } else group
-                                }
-                            } else {
-                                state.reactionGroups + ReactionGroup(
-                                    emoji = emoji,
-                                    customEmoji = null,
-                                    count = 1,
-                                    reactors = emptyList(),
-                                    viewerHasReacted = true
-                                )
                             }
-                        }
-
-                        val totalReactions = updatedGroups.sumOf { it.count }
-
-                        state.copy(
-                            reactionGroups = updatedGroups,
-                            isReacting = false,
-                            post = state.post?.copy(
-                                engagementStats = state.post.engagementStats.copy(
-                                    reactions = totalReactions
-                                )
+                        } else {
+                            state.reactionGroups + ReactionGroup(
+                                emoji = emoji,
+                                customEmoji = null,
+                                count = 1,
+                                reactors = emptyList(),
+                                viewerHasReacted = true,
                             )
-                        )
+                        }
                     }
+
+                    val totalReactions = updatedGroups.sumOf { it.count }
+
+                    state.copy(
+                        reactionGroups = updatedGroups,
+                        isReacting = false,
+                        post = state.post?.copy(
+                            engagementStats = state.post.engagementStats.copy(
+                                reactions = totalReactions,
+                            ),
+                        ),
+                    )
                 }
-                .onFailure {
-                    _uiState.update { it.copy(isReacting = false) }
-                }
+            }.onFailure {
+                _uiState.update { it.copy(isReacting = false) }
+            }
         }
     }
 }

@@ -73,4 +73,20 @@ suspend fun HackersPubRepository.notificationsPage(after: String?) =
     getNotifications(after = after, refresh = (after == null))
         .map { CursorPage(it.notifications, it.endCursor, it.hasNextPage) }
 
+suspend fun HackersPubRepository.personalTimelinePage(after: String?) =
+    getPersonalTimeline(after = after, refresh = (after == null))
+        .map { CursorPage(it.posts, it.endCursor, it.hasNextPage) }
+
+suspend fun HackersPubRepository.publicTimelinePage(after: String?) =
+    getPublicTimeline(after = after, refresh = (after == null))
+        .map { CursorPage(it.posts, it.endCursor, it.hasNextPage) }
+
+suspend fun HackersPubRepository.localTimelinePage(after: String?) =
+    getLocalTimeline(after = after, refresh = (after == null))
+        .map { CursorPage(it.posts, it.endCursor, it.hasNextPage) }
+
+suspend fun HackersPubRepository.postRepliesPage(postId: String, after: String?) =
+    getPostReplies(postId, after)
+        .map { CursorPage(it.posts, it.endCursor, it.hasNextPage) }
+
 // endregion
