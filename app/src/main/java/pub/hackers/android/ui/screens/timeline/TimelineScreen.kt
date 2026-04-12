@@ -162,10 +162,6 @@ fun TimelineScreen(
         ) {
             val refresh = items.loadState.refresh
             when {
-                refresh is LoadState.Loading && items.itemCount == 0 -> {
-                    FullScreenLoading()
-                }
-
                 refresh is LoadState.Error && items.itemCount == 0 -> {
                     ErrorMessage(
                         message = refresh.error.message ?: stringResource(R.string.error_generic),
@@ -173,8 +169,13 @@ fun TimelineScreen(
                     )
                 }
 
-                refresh is LoadState.NotLoading && items.itemCount == 0 -> {
+                items.itemCount == 0 && refresh is LoadState.NotLoading && refresh.endOfPaginationReached -> {
                     ErrorMessage(message = stringResource(R.string.no_posts))
+                }
+
+                items.itemCount == 0 -> {
+                    // Initial load in progress (Loading, or pre-Loading NotLoading frame).
+                    FullScreenLoading()
                 }
 
                 else -> {

@@ -27,7 +27,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import pub.hackers.android.ui.components.LargeTitleHeader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -47,6 +46,7 @@ import pub.hackers.android.domain.model.Notification
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
+import pub.hackers.android.ui.components.LargeTitleHeader
 import pub.hackers.android.ui.components.LoadingItem
 import pub.hackers.android.ui.theme.AppShapes
 import pub.hackers.android.ui.theme.LocalAppColors
@@ -86,16 +86,14 @@ fun NotificationsScreen(
         ) {
             val refresh = items.loadState.refresh
             when {
-                refresh is LoadState.Loading && items.itemCount == 0 -> {
-                    FullScreenLoading()
-                }
                 refresh is LoadState.Error && items.itemCount == 0 -> {
                     ErrorMessage(
                         message = refresh.error.message ?: stringResource(R.string.error_generic),
                         onRetry = { items.refresh() }
                     )
                 }
-                refresh is LoadState.NotLoading && items.itemCount == 0 -> {
+
+                items.itemCount == 0 && refresh is LoadState.NotLoading && refresh.endOfPaginationReached -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -108,6 +106,11 @@ fun NotificationsScreen(
                         )
                     }
                 }
+
+                items.itemCount == 0 -> {
+                    FullScreenLoading()
+                }
+
                 else -> {
                     PullToRefreshBox(
                         isRefreshing = refresh is LoadState.Loading,
@@ -156,22 +159,27 @@ private fun NotificationItem(
             Icons.Default.PersonAdd,
             stringResource(R.string.notification_follow)
         )
+
         is Notification.Mention -> Pair(
             Icons.Outlined.AlternateEmail,
             stringResource(R.string.notification_mention)
         )
+
         is Notification.Reply -> Pair(
             Icons.Default.Reply,
             stringResource(R.string.notification_reply)
         )
+
         is Notification.Quote -> Pair(
             Icons.Default.FormatQuote,
             stringResource(R.string.notification_quote)
         )
+
         is Notification.Share -> Pair(
             Icons.Default.Repeat,
             stringResource(R.string.notification_share)
         )
+
         is Notification.React -> Pair(
             Icons.Default.Favorite,
             notification.emoji?.let { "$it" } ?: stringResource(R.string.notification_react)
