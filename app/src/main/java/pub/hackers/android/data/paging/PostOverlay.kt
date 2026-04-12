@@ -1,8 +1,12 @@
 package pub.hackers.android.data.paging
 
 import androidx.compose.runtime.Immutable
+import androidx.paging.PagingData
+import androidx.paging.filter
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.ReactionGroup
@@ -67,5 +71,25 @@ class PostOverlayStore {
 
     fun clear(postId: String) {
         _overlays.update { it - postId }
+    }
+}
+
+/**
+ * Drop duplicates across pages keyed by effective display id
+ * (`sharedPost.id` for reposts, else `id`).
+ *
+ * Fixes two classes of bugs:
+ * 1. LazyColumn duplicate-key crash when the server returns the same outer
+ *    post id in multiple pages.
+ * 2. Same-content-twice rendering when the server returns both an original
+ *    post and a repost wrapping it in the same feed.
+ *
+ * A fresh [HashSet] is allocated per new [PagingData] emission, so refresh
+ * resets the seen set correctly.
+ */
+fun Flow<PagingData<Post>>.distinctByEffectiveId(): Flow<PagingData<Post>> = map { pagingData ->
+    val seen = HashSet<String>()
+    pagingData.filter { post ->
+        seen.add(post.sharedPost?.id ?: post.id)
     }
 }

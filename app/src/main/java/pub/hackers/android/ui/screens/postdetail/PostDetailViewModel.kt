@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import pub.hackers.android.data.local.PreferencesManager
 import pub.hackers.android.data.local.SessionManager
 import pub.hackers.android.data.paging.cursorPager
+import pub.hackers.android.data.paging.distinctByEffectiveId
 import pub.hackers.android.data.paging.postRepliesPage
 import pub.hackers.android.data.repository.HackersPubRepository
 import pub.hackers.android.domain.model.Actor
@@ -60,6 +61,7 @@ class PostDetailViewModel @Inject constructor(
     val replies: Flow<PagingData<Post>> =
         cursorPager { after -> repository.postRepliesPage(postId, after) }
             .flow
+            .distinctByEffectiveId()
             .cachedIn(viewModelScope)
 
     init {

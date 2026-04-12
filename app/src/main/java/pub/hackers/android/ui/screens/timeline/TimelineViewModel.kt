@@ -17,6 +17,7 @@ import pub.hackers.android.data.local.PreferencesManager
 import pub.hackers.android.data.paging.PostOverlayStore
 import pub.hackers.android.data.paging.applyOverlays
 import pub.hackers.android.data.paging.cursorPager
+import pub.hackers.android.data.paging.distinctByEffectiveId
 import pub.hackers.android.data.paging.personalTimelinePage
 import pub.hackers.android.data.repository.HackersPubRepository
 import pub.hackers.android.domain.model.Post
@@ -42,6 +43,7 @@ class TimelineViewModel @Inject constructor(
     val posts: Flow<PagingData<Post>> = combine(
         cursorPager { after -> repository.personalTimelinePage(after) }
             .flow
+            .distinctByEffectiveId()
             .cachedIn(viewModelScope),
         overlayStore.overlays,
     ) { paging, overlays ->
