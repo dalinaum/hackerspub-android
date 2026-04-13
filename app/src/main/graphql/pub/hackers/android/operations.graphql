@@ -777,3 +777,67 @@ query RecommendedActors($limit: Int = 10) {
         bio
     }
 }
+
+mutation SaveArticleDraft($title: String!, $content: Markdown!, $tags: [String!]!, $id: ID) {
+    saveArticleDraft(input: { title: $title, content: $content, tags: $tags, id: $id }) {
+        ... on SaveArticleDraftPayload {
+            draft {
+                id
+                title
+                content
+                tags
+                created
+                updated
+            }
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation DeleteArticleDraft($id: ID!) {
+    deleteArticleDraft(input: { id: $id }) {
+        ... on DeleteArticleDraftPayload {
+            deletedDraftId
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+query ArticleDrafts {
+    viewer {
+        id
+        articleDrafts(first: 50) {
+            edges {
+                node {
+                    id
+                    title
+                    content
+                    tags
+                    created
+                    updated
+                }
+            }
+        }
+    }
+}
+
+query ArticleDraft($id: ID!) {
+    articleDraft(id: $id) {
+        id
+        title
+        content
+        tags
+        created
+        updated
+    }
+}
