@@ -232,6 +232,15 @@ data class QuotesResult(
     val endCursor: String?
 )
 
+data class ArticleDraft(
+    val id: String,
+    val title: String,
+    val content: String,
+    val tags: List<String>,
+    val created: Instant,
+    val updated: Instant
+)
+
 data class ProfileResult(
     val actor: Actor,
     val bio: String?,
