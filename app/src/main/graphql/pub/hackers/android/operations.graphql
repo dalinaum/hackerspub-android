@@ -58,7 +58,7 @@ fragment PostFields on Post {
     engagementStats {
         ...EngagementStatsFields
     }
-    mentions(first: 5) {
+    mentions(first: 20) {
         edges {
             node {
                 handle
@@ -111,7 +111,7 @@ fragment SharedPostFields on Post {
     engagementStats {
         ...EngagementStatsFields
     }
-    mentions(first: 5) {
+    mentions(first: 20) {
         edges {
             node {
                 handle
