@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Login
@@ -181,6 +182,29 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
                         text = stringResource(R.string.sign_out),
+                        style = typography.bodyLarge,
+                        color = colors.textPrimary
+                    )
+                }
+
+                HorizontalDivider(color = colors.divider, thickness = 1.dp)
+
+                // My Drafts
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onDraftsClick() }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.Article,
+                        contentDescription = null,
+                        tint = colors.textSecondary
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = stringResource(R.string.my_drafts),
                         style = typography.bodyLarge,
                         color = colors.textPrimary
                     )
