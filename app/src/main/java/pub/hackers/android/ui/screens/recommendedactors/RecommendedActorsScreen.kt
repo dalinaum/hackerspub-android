@@ -142,12 +142,12 @@ private fun RecommendedActorCard(
                 RichDisplayName(
                     name = actor.name,
                     fallback = actor.handle,
-                    style = typography.titleSmall,
+                    style = typography.bodyLargeSemiBold,
                     color = colors.textPrimary
                 )
                 Text(
                     text = actor.handle,
-                    style = typography.bodySmall,
+                    style = typography.labelSmall,
                     color = colors.textSecondary
                 )
             }
