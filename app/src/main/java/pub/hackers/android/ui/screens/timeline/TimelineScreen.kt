@@ -60,6 +60,7 @@ fun TimelineScreen(
     onQuoteClick: (String) -> Unit = {},
     onSettingsClick: () -> Unit,
     onRecommendedActorsClick: () -> Unit = {},
+    onComposeArticleClick: () -> Unit = {},
     postedAt: Long = 0L,
     tabRetapped: Long = 0L,
     userAvatarUrl: String? = null,

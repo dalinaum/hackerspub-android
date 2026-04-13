@@ -41,7 +41,9 @@ import pub.hackers.android.ui.components.BottomNavItem
 import pub.hackers.android.ui.components.LocalFontScale
 import pub.hackers.android.ui.components.ProvideInAppBrowserUriHandler
 import pub.hackers.android.ui.screens.auth.SignInScreen
+import pub.hackers.android.ui.screens.compose.ComposeArticleScreen
 import pub.hackers.android.ui.screens.compose.ComposeScreen
+import pub.hackers.android.ui.screens.drafts.DraftsScreen
 import pub.hackers.android.ui.screens.explore.ExploreScreen
 import pub.hackers.android.ui.screens.notifications.NotificationsScreen
 import pub.hackers.android.ui.screens.postdetail.PostDetailScreen
@@ -124,6 +126,12 @@ sealed class DetailScreen(val route: String) {
         fun createRoute(handle: String) = "profile/$handle"
     }
     data object RecommendedActors : DetailScreen("recommended-actors")
+    data object ComposeArticle : DetailScreen("compose-article?draftId={draftId}") {
+        fun createRoute(draftId: String? = null): String {
+            return if (draftId != null) "compose-article?draftId=$draftId" else "compose-article"
+        }
+    }
+    data object Drafts : DetailScreen("drafts")
 }
 
 @Composable
@@ -322,6 +330,9 @@ fun HackersPubApp(
                     },
                     onRecommendedActorsClick = {
                         navController.navigate(DetailScreen.RecommendedActors.route)
+                    },
+                    onComposeArticleClick = {
+                        navController.navigate(DetailScreen.ComposeArticle.createRoute())
                     }
                 )
             }
@@ -398,6 +409,9 @@ fun HackersPubApp(
                     },
                     onProfileClick = { handle ->
                         navController.navigate(DetailScreen.Profile.createRoute(handle))
+                    },
+                    onDraftsClick = {
+                        navController.navigate(DetailScreen.Drafts.route)
                     },
                     isLoggedIn = isLoggedIn
                 )
@@ -513,6 +527,39 @@ fun HackersPubApp(
                     },
                     onQuoteClick = { postId ->
                         navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
+                    }
+                )
+            }
+
+            composable(
+                route = DetailScreen.ComposeArticle.route,
+                arguments = listOf(
+                    navArgument("draftId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { backStackEntry ->
+                val draftId = backStackEntry.arguments?.getString("draftId")
+                ComposeArticleScreen(
+                    draftId = draftId,
+                    onSaveSuccess = {
+                        navController.popBackStack()
+                    },
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            composable(DetailScreen.Drafts.route) {
+                DraftsScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
+                    onDraftClick = { draftId ->
+                        navController.navigate(DetailScreen.ComposeArticle.createRoute(draftId))
                     }
                 )
             }

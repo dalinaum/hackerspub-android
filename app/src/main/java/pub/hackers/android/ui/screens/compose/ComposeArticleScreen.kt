@@ -140,7 +140,7 @@ fun ComposeArticleScreen(
                         .fillMaxWidth()
                         .focusRequester(titleFocusRequester),
                     enabled = !uiState.isSaving,
-                    textStyle = typography.headlineMedium.copy(
+                    textStyle = typography.titleLarge.copy(
                         color = colors.textPrimary
                     ),
                     cursorBrush = SolidColor(colors.composeAccent),
@@ -150,7 +150,7 @@ fun ComposeArticleScreen(
                             if (uiState.title.isEmpty()) {
                                 Text(
                                     text = stringResource(R.string.article_title_hint),
-                                    style = typography.headlineMedium,
+                                    style = typography.titleLarge,
                                     color = colors.textSecondary
                                 )
                             }

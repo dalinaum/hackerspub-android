@@ -184,14 +184,14 @@ private fun DraftItem(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = dateFormatter.format(draft.updated),
-                style = typography.bodySmall,
+                style = typography.labelMedium,
                 color = colors.textSecondary
             )
             if (draft.tags.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = draft.tags.joinToString(", "),
-                    style = typography.bodySmall,
+                    style = typography.labelMedium,
                     color = colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

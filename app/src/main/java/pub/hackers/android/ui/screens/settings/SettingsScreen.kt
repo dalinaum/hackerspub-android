@@ -59,6 +59,7 @@ fun SettingsScreen(
     onSignInClick: () -> Unit,
     onSignOutComplete: () -> Unit,
     onProfileClick: (String) -> Unit,
+    onDraftsClick: () -> Unit = {},
     isLoggedIn: Boolean,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
