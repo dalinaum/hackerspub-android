@@ -28,6 +28,7 @@ class RecommendedActorsViewModel @Inject constructor(
 
     private val bufferQueue = mutableListOf<Actor>()
     private val seenActorIds = mutableSetOf<String>()
+    private var isFetching = false
 
     init {
         loadInitialBatch()
@@ -36,6 +37,7 @@ class RecommendedActorsViewModel @Inject constructor(
     private fun loadInitialBatch() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
+            isFetching = true
             repository.getRecommendedActors(limit = FETCH_SIZE).fold(
                 onSuccess = { actors ->
                     val newActors = actors.filter { it.id !in seenActorIds }
@@ -47,6 +49,7 @@ class RecommendedActorsViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false, error = e.message) }
                 }
             )
+            isFetching = false
         }
     }
 
@@ -78,15 +81,19 @@ class RecommendedActorsViewModel @Inject constructor(
     }
 
     private fun fetchMoreActors() {
+        if (isFetching) return
+        isFetching = true
         viewModelScope.launch {
+            val bufferIds = bufferQueue.map { it.id }.toSet()
             repository.getRecommendedActors(limit = FETCH_SIZE).fold(
                 onSuccess = { actors ->
-                    val newActors = actors.filter { it.id !in seenActorIds }
+                    val newActors = actors.filter { it.id !in seenActorIds && it.id !in bufferIds }
                     bufferQueue.addAll(newActors)
                     updateDisplayedActors()
                 },
                 onFailure = { /* silently fail for background fetch */ }
             )
+            isFetching = false
         }
     }
 
