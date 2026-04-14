@@ -18,6 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -303,17 +307,18 @@ fun PostDetailScreen(
                 error = uiState.error,
                 onRetry = { viewModel.loadPost(postId) },
             ) { resolvedPost ->
+                val replies = viewModel.replies.collectAsLazyPagingItems()
                 PullToRefreshBox(
                     isRefreshing = uiState.isRefreshing,
-                    onRefresh = { viewModel.refresh() }
+                    onRefresh = {
+                        viewModel.refresh()
+                        replies.refresh()
+                    }
                 ) {
                     PostDetailContent(
                         post = resolvedPost,
                         reactionGroups = uiState.reactionGroups,
-                        replies = uiState.replies,
-                        hasMoreReplies = uiState.hasMoreReplies,
-                        isLoadingMoreReplies = uiState.isLoadingMoreReplies,
-                        onLoadMoreReplies = { viewModel.loadMoreReplies() },
+                        replies = replies,
                         onProfileClick = onProfileClick,
                         onPostClick = onPostClick,
                         onReplyClick = { onReplyClick(postId) },
@@ -401,10 +406,7 @@ private fun PostDetailActionMenu(
 internal fun PostDetailContent(
     post: Post,
     reactionGroups: List<ReactionGroup>,
-    replies: List<Post>,
-    hasMoreReplies: Boolean = false,
-    isLoadingMoreReplies: Boolean = false,
-    onLoadMoreReplies: () -> Unit = {},
+    replies: LazyPagingItems<Post>,
     onProfileClick: (String) -> Unit,
     onPostClick: (String) -> Unit,
     onShareClick: () -> Unit,
@@ -414,7 +416,7 @@ internal fun PostDetailContent(
     onQuoteClick: () -> Unit,
     onSharesClick: () -> Unit,
     onQuotesClick: () -> Unit,
-    onExternalShareClick: () -> Unit
+    onExternalShareClick: () -> Unit,
 ) {
     val colors = LocalAppColors.current
     val typography = LocalAppTypography.current
@@ -800,7 +802,7 @@ internal fun PostDetailContent(
             }
         }
 
-        if (replies.isNotEmpty()) {
+        if (replies.itemCount > 0) {
             item {
                 Text(
                     text = stringResource(R.string.replies),
@@ -811,9 +813,10 @@ internal fun PostDetailContent(
             }
 
             items(
-                items = replies,
-                key = { it.id }
-            ) { reply ->
+                count = replies.itemCount,
+                key = replies.itemKey { it.id }
+            ) { index ->
+                val reply = replies[index] ?: return@items
                 PostCard(
                     post = reply,
                     onClick = { onPostClick(reply.id) },
@@ -823,20 +826,9 @@ internal fun PostDetailContent(
                 HorizontalDivider(thickness = 0.5.dp, color = colors.divider)
             }
 
-            if (isLoadingMoreReplies) {
+            if (replies.loadState.append is LoadState.Loading) {
                 item {
                     LoadingItem()
-                }
-            } else if (hasMoreReplies) {
-                item {
-                    TextButton(
-                        onClick = onLoadMoreReplies,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp)
-                    ) {
-                        Text(stringResource(R.string.load_more))
-                    }
                 }
             }
         }
