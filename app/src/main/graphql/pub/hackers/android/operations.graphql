@@ -326,6 +326,27 @@ query ActorByHandle($handle: String!, $after: String) {
     }
 }
 
+query ActorPosts($handle: String!, $after: String) {
+    actorByHandle(handle: $handle, allowLocalHandle: true) {
+        id
+        posts(first: 20, after: $after) {
+            edges {
+                cursor
+                node {
+                    ...PostFields
+                    sharedPost {
+                        ...SharedPostFields
+                    }
+                }
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+        }
+    }
+}
+
 query ActorArticles($handle: String!, $after: String) {
     actorByHandle(handle: $handle, allowLocalHandle: true) {
         id
@@ -411,6 +432,28 @@ query PostDetail($id: ID!, $repliesAfter: String) {
                 }
             }
             replies(first: 20, after: $repliesAfter) {
+                edges {
+                    cursor
+                    node {
+                        ...PostFields
+                        sharedPost {
+                            ...SharedPostFields
+                        }
+                    }
+                }
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+            }
+        }
+    }
+}
+
+query PostReplies($id: ID!, $after: String) {
+    node(id: $id) {
+        ... on Post {
+            replies(first: 20, after: $after) {
                 edges {
                     cursor
                     node {

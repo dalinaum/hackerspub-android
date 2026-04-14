@@ -4,12 +4,15 @@ import com.apollographql.apollo.ApolloClient
 import com.apollographql.apollo.api.Optional
 import com.apollographql.apollo.cache.normalized.FetchPolicy
 import com.apollographql.apollo.cache.normalized.fetchPolicy
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import pub.hackers.android.domain.model.*
 import pub.hackers.android.graphql.ArticleDraftQuery
 import pub.hackers.android.graphql.ArticleDraftsQuery
 import pub.hackers.android.graphql.ActorArticlesQuery
 import pub.hackers.android.graphql.ActorByHandleQuery
 import pub.hackers.android.graphql.ActorNotesQuery
+import pub.hackers.android.graphql.ActorPostsQuery
 import pub.hackers.android.graphql.AddReactionToPostMutation
 import pub.hackers.android.graphql.BlockActorMutation
 import pub.hackers.android.graphql.CompleteLoginChallengeMutation
@@ -25,6 +28,7 @@ import pub.hackers.android.graphql.LoginByUsernameMutation
 import pub.hackers.android.graphql.NotificationsQuery
 import pub.hackers.android.graphql.PersonalTimelineQuery
 import pub.hackers.android.graphql.PostQuotesQuery
+import pub.hackers.android.graphql.PostRepliesQuery
 import pub.hackers.android.graphql.PostSharesQuery
 import pub.hackers.android.graphql.PostDetailQuery
 import pub.hackers.android.graphql.PublicTimelineQuery
@@ -302,6 +306,84 @@ class HackersPubRepository @Inject constructor(
                         viewerBlocks = actor.viewerBlocks
                     )
                 )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Paginated replies for a post. Separate from [getPostDetail] so that
+     * scrolling the reply list never re-fetches the main post body.
+     *
+     * The mapping block runs in `Dispatchers.Default` because the caller is
+     * typically `viewModelScope.launch` (Main.immediate) and the `.mapNotNull`
+     * over nested post graphs is CPU-bound. The Apollo `.execute()` call
+     * itself is already dispatched off the main thread by OkHttp/Apollo.
+     */
+    suspend fun getPostReplies(postId: String, after: String? = null): Result<TimelineResult> {
+        return try {
+            val response = apolloClient.query(
+                PostRepliesQuery(postId, Optional.presentIfNotNull(after))
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val replies = response.data?.node?.onPost?.replies
+                    ?: return Result.failure(Exception("Post not found"))
+
+                withContext(Dispatchers.Default) {
+                    Result.success(
+                        TimelineResult(
+                            // Defensive dedup by outer id: server occasionally returns
+                            // duplicate edges across pages (PR #83). Paging layer adds
+                            // distinctByEffectiveId (sharedPost.id ?: id) in PostOverlay.kt.
+                            posts = replies.edges.mapNotNull { edge ->
+                                edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
+                            }.distinctBy { it.id },
+                            hasNextPage = replies.pageInfo.hasNextPage,
+                            endCursor = replies.pageInfo.endCursor
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Lightweight actor posts query for the POSTS tab on profile. Mirrors
+     * [getActorNotes] / [getActorArticles]; avoids re-fetching the actor
+     * header on every paginated page (unlike [getProfile]).
+     */
+    suspend fun getActorPosts(handle: String, after: String? = null): Result<TimelineResult> {
+        return try {
+            val response = apolloClient.query(
+                ActorPostsQuery(handle, Optional.presentIfNotNull(after))
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val posts = response.data?.actorByHandle?.posts
+                    ?: return Result.failure(Exception("Actor not found"))
+
+                withContext(Dispatchers.Default) {
+                    Result.success(
+                        TimelineResult(
+                            // Defensive dedup by outer id: server occasionally returns
+                            // duplicate edges across pages (PR #83). Paging layer adds
+                            // distinctByEffectiveId (sharedPost.id ?: id) in PostOverlay.kt.
+                            posts = posts.edges.mapNotNull { edge ->
+                                edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
+                            }.distinctBy { it.id },
+                            hasNextPage = posts.pageInfo.hasNextPage,
+                            endCursor = posts.pageInfo.endCursor
+                        )
+                    )
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)
