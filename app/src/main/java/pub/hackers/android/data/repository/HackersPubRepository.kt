@@ -75,7 +75,7 @@ class HackersPubRepository @Inject constructor(
                 withContext(Dispatchers.Default) {
                     Result.success(
                         TimelineResult(
-                            posts = data?.edges?.mapNotNull { edge ->
+                            posts = data?.edges?.map { edge ->
                                 edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
                             }?.distinctBy { it.id } ?: emptyList(),
                             hasNextPage = data?.pageInfo?.hasNextPage ?: false,
@@ -102,7 +102,7 @@ class HackersPubRepository @Inject constructor(
                 withContext(Dispatchers.Default) {
                     Result.success(
                         TimelineResult(
-                            posts = data?.edges?.mapNotNull { edge ->
+                            posts = data?.edges?.map { edge ->
                                 edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
                             }?.distinctBy { it.id } ?: emptyList(),
                             hasNextPage = data?.pageInfo?.hasNextPage ?: false,
@@ -129,7 +129,7 @@ class HackersPubRepository @Inject constructor(
                 withContext(Dispatchers.Default) {
                     Result.success(
                         TimelineResult(
-                            posts = data?.edges?.mapNotNull { edge ->
+                            posts = data?.edges?.map { edge ->
                                 edge.node.postFields.toPost(
                                     sharedPost = edge.node.sharedPost?.sharedPostFields?.toPost(),
                                     replyTarget = edge.node.replyTarget?.postFields?.toPost(),
@@ -183,7 +183,7 @@ class HackersPubRepository @Inject constructor(
             if (response.hasErrors()) {
                 Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
             } else {
-                val posts = response.data?.searchPost?.edges?.mapNotNull { edge ->
+                val posts = response.data?.searchPost?.edges?.map { edge ->
                     edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
                 } ?: emptyList()
                 Result.success(posts)
@@ -240,7 +240,7 @@ class HackersPubRepository @Inject constructor(
                         }
                     }
 
-                    val replies = node.replies.edges.mapNotNull { edge ->
+                    val replies = node.replies.edges.map { edge ->
                         edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
                     }
 
@@ -337,7 +337,7 @@ class HackersPubRepository @Inject constructor(
                             // Defensive dedup by outer id: server occasionally returns
                             // duplicate edges across pages (PR #83). Paging layer adds
                             // distinctByEffectiveId (sharedPost.id ?: id) in PostOverlay.kt.
-                            posts = replies.edges.mapNotNull { edge ->
+                            posts = replies.edges.map { edge ->
                                 edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
                             }.distinctBy { it.id },
                             hasNextPage = replies.pageInfo.hasNextPage,
@@ -374,7 +374,7 @@ class HackersPubRepository @Inject constructor(
                             // Defensive dedup by outer id: server occasionally returns
                             // duplicate edges across pages (PR #83). Paging layer adds
                             // distinctByEffectiveId (sharedPost.id ?: id) in PostOverlay.kt.
-                            posts = posts.edges.mapNotNull { edge ->
+                            posts = posts.edges.map { edge ->
                                 edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
                             }.distinctBy { it.id },
                             hasNextPage = posts.pageInfo.hasNextPage,
@@ -403,7 +403,7 @@ class HackersPubRepository @Inject constructor(
 
                     Result.success(
                         TimelineResult(
-                            posts = articles.edges.mapNotNull { edge ->
+                            posts = articles.edges.map { edge ->
                                 edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
                             },
                             hasNextPage = articles.pageInfo.hasNextPage,
@@ -432,7 +432,7 @@ class HackersPubRepository @Inject constructor(
 
                     Result.success(
                         TimelineResult(
-                            posts = notes.edges.mapNotNull { edge ->
+                            posts = notes.edges.map { edge ->
                                 edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
                             },
                             hasNextPage = notes.pageInfo.hasNextPage,
@@ -1030,7 +1030,7 @@ class HackersPubRepository @Inject constructor(
 
                 Result.success(
                     QuotesResult(
-                        posts = quotes.edges.mapNotNull { edge ->
+                        posts = quotes.edges.map { edge ->
                             edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
                         },
                         hasNextPage = quotes.pageInfo.hasNextPage,
@@ -1253,7 +1253,7 @@ class HackersPubRepository @Inject constructor(
             content = content.toString(),
             excerpt = excerpt,
             url = url?.toString(),
-            iri = iri?.toString(),
+            iri = iri.toString(),
             viewerHasShared = viewerHasShared,
             actor = actor.actorFields.toActor(),
             media = media.map { it.mediaFields.toMedia() },
@@ -1319,7 +1319,7 @@ class HackersPubRepository @Inject constructor(
             content = content.toString(),
             excerpt = excerpt,
             url = url?.toString(),
-            iri = iri?.toString(),
+            iri = iri.toString(),
             viewerHasShared = viewerHasShared,
             actor = actor.actorFields.toActor(),
             media = media.map { it.mediaFields.toMedia() },
@@ -1344,7 +1344,7 @@ class HackersPubRepository @Inject constructor(
             alt = alt,
             height = height,
             width = width,
-            mediaType = type?.toString()
+            mediaType = "$type"
         )
     }
 
