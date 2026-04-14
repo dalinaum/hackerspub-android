@@ -45,19 +45,25 @@ class CursorPagingSource<T : Any>(
 /**
  * Convenience factory — wraps [CursorPagingSource] with our standard [PagingConfig].
  *
- * Defaults tuned from Network Inspector findings (~15 KB per post, ~1 s for a
- * 60-post page) to balance cold-start latency and scroll buffer:
- * - pageSize 20 matches the server's GraphQL `first: 20`
- * - prefetchDistance 20 (one full page ahead) keeps fast scrolling ahead of the
- *   network round trip
- * - initialLoadSize 30 (1.5 pages) primes the list without paying the cost of
- *   a 3*pageSize default
- * - placeholders disabled — existing UI has no skeleton support
+ * Defaults:
+ * - `pageSize = 20` matches the server's GraphQL `first: 20` (we can't request
+ *   more per page regardless, so this is the practical ceiling).
+ * - `prefetchDistance = 5` triggers the next page fetch only once the user is
+ *   within ~half a viewport of the loaded window's end. The previous value of
+ *   20 (one full page ahead) caused cascading prefetches right after the first
+ *   render: with only 20 items loaded and `distance-from-end < prefetchDistance`
+ *   satisfied after any small scroll, page 2, 3, 4… fired back-to-back.
+ * - `initialLoadSize = 20` equals `pageSize` and equals the server's fixed
+ *   first-page size, so Paging's "desired vs delivered" check doesn't
+ *   immediately schedule an append. (The previous 30 was wishful — server
+ *   only returns 20, and asking for 30 made Paging think the window was
+ *   under-filled on first load.)
+ * - `enablePlaceholders = false` — existing UI has no skeleton support.
  */
 fun <T : Any> cursorPager(
     pageSize: Int = 20,
-    prefetchDistance: Int = 20,
-    initialLoadSize: Int = 30,
+    prefetchDistance: Int = 5,
+    initialLoadSize: Int = 20,
     fetch: suspend (String?) -> Result<CursorPage<T>>,
 ): Pager<String, T> = Pager(
     config = PagingConfig(
