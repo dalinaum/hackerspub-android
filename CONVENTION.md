@@ -146,6 +146,17 @@ Simple formatting of primitive values (numbers, short strings) is cheap enough t
 
 For new Composable parameters that accept collections, prefer `kotlinx.collections.immutable.ImmutableList<T>` over `List<T>` to preserve Compose's stable-skipping. Existing `List<T>` signatures are not retroactively migrated by this rule; it applies to new code.
 
+### §5.4 `Modifier` parameter position
+
+Composable parameters follow the Compose API Guidelines for `Modifier`:
+
+- `modifier: Modifier = Modifier` is the **first optional parameter**, immediately after all required parameters.
+- The default value is bare `Modifier` — do not pre-apply modifiers inside the default (`Modifier.fillMaxWidth()` etc.). The caller composes modifiers.
+- When a Composable has other optional parameters, `modifier` comes **before** them. Trailing-lambda content (`content: @Composable () -> Unit`) is the usual exception and goes last.
+- Internal `@Composable` helpers that always require a modifier from the caller may omit the default, but must still place the `modifier` parameter as the first `Modifier`-typed parameter.
+
+This is an established convention in the project — see commit `0e92f03` (PR #86) which refactored `HtmlContent` specifically to fix a violation, and every `ui/components/*.kt` Composable follows the pattern.
+
 ---
 
 ## §6 ViewModel and state
@@ -292,6 +303,7 @@ Do not commit KSP-generated Apollo code. Regenerate locally with `./gradlew gene
 | §4.3 | Repository response mapping → `Dispatchers.Default` |
 | §4.4 | File I/O → `Dispatchers.IO` |
 | §5.1 | Domain models → `@Immutable` |
+| §5.4 | `modifier: Modifier = Modifier` is the first optional param |
 | §6.2 | UI state → `StateFlow<UiState>` |
 | §6.3 | One-shot events → `Channel` / `SharedFlow` |
 | §7.1 | Repository returns `Result<T>` |
