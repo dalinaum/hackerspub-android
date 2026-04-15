@@ -168,11 +168,19 @@ fun HackersPubApp(
         }
     }
 
-    // Handle navigation intent from system notifications or deep links
+    // Handle navigation intent from system notifications or deep links.
+    // Uses the same options as bottom-nav onItemSelected so that back-stack
+    // save/restore markers line up; otherwise Timeline (=startDestination)
+    // gets stuck in a no-op state on the first bottom-nav tap after arriving
+    // here from a system notification.
     LaunchedEffect(navigationIntent) {
         navigationIntent?.let {
             navController.navigate(it.route) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
                 launchSingleTop = true
+                restoreState = true
             }
             onNavigationIntentConsumed()
         }
