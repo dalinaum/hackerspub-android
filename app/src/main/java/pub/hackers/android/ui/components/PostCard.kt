@@ -839,7 +839,8 @@ fun QuotedPostPreview(
             html = post.content,
             maxLines = 3,
             modifier = Modifier.fillMaxWidth(),
-            onMentionClick = onProfileClick
+            onMentionClick = onProfileClick,
+            onTextClick = onClick
         )
 
         if (post.media.isNotEmpty()) {
