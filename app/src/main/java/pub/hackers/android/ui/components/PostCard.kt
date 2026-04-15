@@ -100,6 +100,7 @@ fun PostCard(
     post: Post,
     onClick: () -> Unit,
     onProfileClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
     onReplyClick: (() -> Unit)? = null,
     onShareClick: (() -> Unit)? = null,
     onQuoteClick: (() -> Unit)? = null,
@@ -107,8 +108,7 @@ fun PostCard(
     onReactionLongPress: (() -> Unit)? = null,
     onExternalShareClick: (() -> Unit)? = null,
     onQuotedPostClick: ((String) -> Unit)? = null,
-    contentMaxLength: Int = 0,
-    modifier: Modifier = Modifier
+    contentMaxLength: Int = 0
 ) {
     val displayPost = post.sharedPost ?: post
 
@@ -148,6 +148,7 @@ private fun NoteCard(
     post: Post,
     onClick: () -> Unit,
     onProfileClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
     onReplyClick: (() -> Unit)? = null,
     onShareClick: (() -> Unit)? = null,
     onQuoteClick: (() -> Unit)? = null,
@@ -155,8 +156,7 @@ private fun NoteCard(
     onReactionLongPress: (() -> Unit)? = null,
     onExternalShareClick: (() -> Unit)? = null,
     onQuotedPostClick: ((String) -> Unit)? = null,
-    contentMaxLength: Int = 0,
-    modifier: Modifier = Modifier
+    contentMaxLength: Int = 0
 ) {
     val displayPost = post.sharedPost ?: post
     val isRepost = post.lastSharer != null
