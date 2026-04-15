@@ -341,6 +341,9 @@ fun HackersPubApp(
                     },
                     onComposeArticleClick = {
                         navController.navigate(DetailScreen.ComposeArticle.createRoute())
+                    },
+                    onComposeArticleLongClick = {
+                        navController.navigate(DetailScreen.Drafts.route)
                     }
                 )
             }
