@@ -29,6 +29,7 @@ data class ComposeArticleUiState(
     val showPublishFields: Boolean = false,
     val isPublishing: Boolean = false,
     val isPublished: Boolean = false,
+    val publishedArticleId: String? = null,
     val publishedArticleUrl: String? = null,
     val error: String? = null
 )
@@ -201,6 +202,7 @@ class ComposeArticleViewModel @Inject constructor(
                         it.copy(
                             isPublishing = false,
                             isPublished = true,
+                            publishedArticleId = article.id,
                             publishedArticleUrl = article.url
                         )
                     }

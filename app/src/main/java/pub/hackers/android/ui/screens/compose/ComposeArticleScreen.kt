@@ -64,6 +64,7 @@ import pub.hackers.android.ui.theme.LocalAppTypography
 fun ComposeArticleScreen(
     draftId: String? = null,
     onSaveSuccess: () -> Unit,
+    onPublishSuccess: (articleId: String) -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: ComposeArticleViewModel = hiltViewModel()
 ) {
@@ -90,8 +91,12 @@ fun ComposeArticleScreen(
 
     LaunchedEffect(uiState.isPublished) {
         if (uiState.isPublished) {
-            snackbarHostState.showSnackbar("Article published")
-            onSaveSuccess()
+            val articleId = uiState.publishedArticleId
+            if (articleId != null) {
+                onPublishSuccess(articleId)
+            } else {
+                onSaveSuccess()
+            }
         }
     }
 

@@ -558,6 +558,10 @@ fun HackersPubApp(
                     onSaveSuccess = {
                         navController.popBackStack()
                     },
+                    onPublishSuccess = { articleId ->
+                        navController.popBackStack()
+                        navController.navigate(DetailScreen.PostDetail.createRoute(articleId))
+                    },
                     onNavigateBack = {
                         navController.popBackStack()
                     }
