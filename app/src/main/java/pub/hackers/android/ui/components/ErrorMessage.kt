@@ -28,10 +28,10 @@ import pub.hackers.android.R
 @Composable
 fun ErrorMessage(
     message: String,
+    modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
     onRefresh: (() -> Unit)? = null,
-    icon: ImageVector? = Icons.Outlined.ErrorOutline,
-    modifier: Modifier = Modifier
+    icon: ImageVector? = Icons.Outlined.ErrorOutline
 ) {
     Column(
         modifier = modifier

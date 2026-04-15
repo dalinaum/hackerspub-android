@@ -51,13 +51,13 @@ fun ArticleCard(
     post: Post,
     onClick: () -> Unit,
     onProfileClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
     onReplyClick: (() -> Unit)? = null,
     onShareClick: (() -> Unit)? = null,
     onQuoteClick: (() -> Unit)? = null,
     onReactionClick: (() -> Unit)? = null,
     onReactionLongPress: (() -> Unit)? = null,
-    onExternalShareClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    onExternalShareClick: (() -> Unit)? = null
 ) {
     val displayPost = post.sharedPost ?: post
     val isRepost = post.lastSharer != null
