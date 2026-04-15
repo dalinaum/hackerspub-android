@@ -341,6 +341,9 @@ fun HackersPubApp(
                     },
                     onComposeArticleClick = {
                         navController.navigate(DetailScreen.ComposeArticle.createRoute())
+                    },
+                    onComposeArticleLongClick = {
+                        navController.navigate(DetailScreen.Drafts.route)
                     }
                 )
             }
@@ -554,6 +557,10 @@ fun HackersPubApp(
                     draftId = draftId,
                     onSaveSuccess = {
                         navController.popBackStack()
+                    },
+                    onPublishSuccess = { articleId ->
+                        navController.popBackStack()
+                        navController.navigate(DetailScreen.PostDetail.createRoute(articleId))
                     },
                     onNavigateBack = {
                         navController.popBackStack()
