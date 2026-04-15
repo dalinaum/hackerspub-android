@@ -119,49 +119,26 @@ class ProfileViewModelTest {
     // region actions (follow/unfollow/block/unblock/removeFollower)
 
     @Test
-    fun `followActor calls repository and triggers refresh`() = runTest {
-        stubLoadProfile()
+    fun `followActor optimistically sets viewerFollows to true`() = runTest {
+        stubLoadProfile(sampleProfile(viewerFollows = false))
         coEvery { repository.followActor(any()) } returns Result.success(Unit)
         val vm = newViewModel()
         advanceUntilIdle()
 
         vm.followActor()
+        // Before coroutine runs, viewerFollows should already be true
+        assertEquals(true, vm.uiState.value.viewerFollows)
+
         advanceUntilIdle()
 
         coVerify(exactly = 1) { repository.followActor("actor-1") }
-        // After action, isPerformingAction goes back to false
+        assertEquals(true, vm.uiState.value.viewerFollows)
         assertEquals(false, vm.uiState.value.isPerformingAction)
     }
 
     @Test
-    fun `unfollowActor calls repository unfollowActor`() = runTest {
-        stubLoadProfile()
-        coEvery { repository.unfollowActor(any()) } returns Result.success(Unit)
-        val vm = newViewModel()
-        advanceUntilIdle()
-
-        vm.unfollowActor()
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { repository.unfollowActor("actor-1") }
-    }
-
-    @Test
-    fun `blockActor calls repository blockActor`() = runTest {
-        stubLoadProfile()
-        coEvery { repository.blockActor(any()) } returns Result.success(Unit)
-        val vm = newViewModel()
-        advanceUntilIdle()
-
-        vm.blockActor()
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { repository.blockActor("actor-1") }
-    }
-
-    @Test
-    fun `action failure stores actionError`() = runTest {
-        stubLoadProfile()
+    fun `followActor rolls back viewerFollows on failure`() = runTest {
+        stubLoadProfile(sampleProfile(viewerFollows = false))
         coEvery { repository.followActor(any()) } returns Result.failure(RuntimeException("network"))
         val vm = newViewModel()
         advanceUntilIdle()
@@ -169,8 +146,70 @@ class ProfileViewModelTest {
         vm.followActor()
         advanceUntilIdle()
 
+        assertEquals(false, vm.uiState.value.viewerFollows)
         assertEquals("network", vm.uiState.value.actionError)
         assertEquals(false, vm.uiState.value.isPerformingAction)
+    }
+
+    @Test
+    fun `unfollowActor optimistically sets viewerFollows to false`() = runTest {
+        stubLoadProfile(sampleProfile(viewerFollows = true))
+        coEvery { repository.unfollowActor(any()) } returns Result.success(Unit)
+        val vm = newViewModel()
+        advanceUntilIdle()
+
+        vm.unfollowActor()
+        assertEquals(false, vm.uiState.value.viewerFollows)
+
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { repository.unfollowActor("actor-1") }
+        assertEquals(false, vm.uiState.value.viewerFollows)
+    }
+
+    @Test
+    fun `unfollowActor rolls back viewerFollows on failure`() = runTest {
+        stubLoadProfile(sampleProfile(viewerFollows = true))
+        coEvery { repository.unfollowActor(any()) } returns Result.failure(RuntimeException("err"))
+        val vm = newViewModel()
+        advanceUntilIdle()
+
+        vm.unfollowActor()
+        advanceUntilIdle()
+
+        assertEquals(true, vm.uiState.value.viewerFollows)
+        assertEquals("err", vm.uiState.value.actionError)
+    }
+
+    @Test
+    fun `blockActor optimistically sets viewerBlocks to true`() = runTest {
+        stubLoadProfile(sampleProfile(viewerBlocks = false))
+        coEvery { repository.blockActor(any()) } returns Result.success(Unit)
+        val vm = newViewModel()
+        advanceUntilIdle()
+
+        vm.blockActor()
+        assertEquals(true, vm.uiState.value.viewerBlocks)
+
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { repository.blockActor("actor-1") }
+        assertEquals(true, vm.uiState.value.viewerBlocks)
+        assertEquals(false, vm.uiState.value.isPerformingAction)
+    }
+
+    @Test
+    fun `blockActor rolls back viewerBlocks on failure`() = runTest {
+        stubLoadProfile(sampleProfile(viewerBlocks = false))
+        coEvery { repository.blockActor(any()) } returns Result.failure(RuntimeException("err"))
+        val vm = newViewModel()
+        advanceUntilIdle()
+
+        vm.blockActor()
+        advanceUntilIdle()
+
+        assertEquals(false, vm.uiState.value.viewerBlocks)
+        assertEquals("err", vm.uiState.value.actionError)
     }
 
     @Test
@@ -186,11 +225,6 @@ class ProfileViewModelTest {
 
         assertNull(vm.uiState.value.actionError)
     }
-
-    // Note: The VM's `isPerformingAction` guard is set inside `viewModelScope.launch`,
-    // so two back-to-back synchronous calls BOTH pass the guard before either
-    // launch body runs. That's acceptable for a debouncing UI button but can't
-    // be asserted cleanly with StandardTestDispatcher; we skip that test.
 
     // endregion
 

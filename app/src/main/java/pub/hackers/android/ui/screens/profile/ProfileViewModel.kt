@@ -130,7 +130,7 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true, error = null) }
 
-            repository.getProfile(handle)
+            repository.getProfile(handle, refresh = true)
                 .onSuccess { profile ->
                     _uiState.update {
                         it.copy(
@@ -156,26 +156,89 @@ class ProfileViewModel @Inject constructor(
         _selectedTab.value = tab
     }
 
-    private fun performAction(op: suspend (String) -> Result<Unit>) {
+    fun followActor() {
         val actorId = _uiState.value.actor?.id ?: return
         if (_uiState.value.isPerformingAction) return
-
+        _uiState.update { it.copy(viewerFollows = true, isPerformingAction = true, actionError = null) }
         viewModelScope.launch {
-            _uiState.update { it.copy(isPerformingAction = true, actionError = null) }
-            op(actorId).onSuccess {
-                refresh()
-                _uiState.update { it.copy(isPerformingAction = false) }
-            }.onFailure { error ->
-                _uiState.update { it.copy(isPerformingAction = false, actionError = error.message) }
-            }
+            repository.followActor(actorId)
+                .onSuccess {
+                    _uiState.update { it.copy(isPerformingAction = false) }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(viewerFollows = false, isPerformingAction = false, actionError = error.message)
+                    }
+                }
         }
     }
 
-    fun followActor() = performAction { repository.followActor(it) }
-    fun unfollowActor() = performAction { repository.unfollowActor(it) }
-    fun blockActor() = performAction { repository.blockActor(it) }
-    fun unblockActor() = performAction { repository.unblockActor(it) }
-    fun removeFollower() = performAction { repository.removeFollower(it) }
+    fun unfollowActor() {
+        val actorId = _uiState.value.actor?.id ?: return
+        if (_uiState.value.isPerformingAction) return
+        _uiState.update { it.copy(viewerFollows = false, isPerformingAction = true, actionError = null) }
+        viewModelScope.launch {
+            repository.unfollowActor(actorId)
+                .onSuccess {
+                    _uiState.update { it.copy(isPerformingAction = false) }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(viewerFollows = true, isPerformingAction = false, actionError = error.message)
+                    }
+                }
+        }
+    }
+    fun blockActor() {
+        val actorId = _uiState.value.actor?.id ?: return
+        if (_uiState.value.isPerformingAction) return
+        _uiState.update { it.copy(viewerBlocks = true, isPerformingAction = true, actionError = null) }
+        viewModelScope.launch {
+            repository.blockActor(actorId)
+                .onSuccess {
+                    _uiState.update { it.copy(isPerformingAction = false) }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(viewerBlocks = false, isPerformingAction = false, actionError = error.message)
+                    }
+                }
+        }
+    }
+
+    fun unblockActor() {
+        val actorId = _uiState.value.actor?.id ?: return
+        if (_uiState.value.isPerformingAction) return
+        _uiState.update { it.copy(viewerBlocks = false, isPerformingAction = true, actionError = null) }
+        viewModelScope.launch {
+            repository.unblockActor(actorId)
+                .onSuccess {
+                    _uiState.update { it.copy(isPerformingAction = false) }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(viewerBlocks = true, isPerformingAction = false, actionError = error.message)
+                    }
+                }
+        }
+    }
+
+    fun removeFollower() {
+        val actorId = _uiState.value.actor?.id ?: return
+        if (_uiState.value.isPerformingAction) return
+        _uiState.update { it.copy(followsViewer = false, isPerformingAction = true, actionError = null) }
+        viewModelScope.launch {
+            repository.removeFollower(actorId)
+                .onSuccess {
+                    _uiState.update { it.copy(isPerformingAction = false) }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(followsViewer = true, isPerformingAction = false, actionError = error.message)
+                    }
+                }
+        }
+    }
 
     fun dismissActionError() {
         _uiState.update { it.copy(actionError = null) }

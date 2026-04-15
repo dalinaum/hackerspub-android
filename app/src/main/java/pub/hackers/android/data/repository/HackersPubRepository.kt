@@ -261,11 +261,11 @@ class HackersPubRepository @Inject constructor(
         }
     }
 
-    suspend fun getProfile(handle: String): Result<ProfileResult> {
+    suspend fun getProfile(handle: String, refresh: Boolean = false): Result<ProfileResult> {
         return try {
             val response = apolloClient.query(
                 ActorByHandleQuery(handle)
-            ).execute()
+            ).apply { if (refresh) fetchPolicy(FetchPolicy.NetworkOnly) }.execute()
 
             if (response.hasErrors()) {
                 Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
