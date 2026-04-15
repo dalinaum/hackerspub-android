@@ -82,6 +82,11 @@
     <string name="notification_quote">quoted your post</string>
     <string name="notification_share">shared your post</string>
     <string name="notification_react">reacted to your post</string>
+    <string name="notification_react_with_emoji">reacted to your post with %1$s</string>
+    <plurals name="notification_and_others">
+        <item quantity="one">and %1$d other</item>
+        <item quantity="other">and %1$d others</item>
+    </plurals>
     <string name="no_notifications">No Notifications\nWhen you receive notifications, they\'ll appear here</string>
     <string name="notification_post_unavailable">(Post unavailable)</string>
 

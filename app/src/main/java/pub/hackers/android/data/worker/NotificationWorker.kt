@@ -136,7 +136,14 @@ class NotificationWorker @AssistedInject constructor(
             is Notification.Reply -> "$actorName replied to your post"
             is Notification.Quote -> "$actorName quoted your post"
             is Notification.Share -> "$actorName shared your post"
-            is Notification.React -> "$actorName reacted to your post"
+            is Notification.React -> {
+                val othersCount = notification.actors.size - 1
+                val othersText = if (othersCount > 0) {
+                    " and $othersCount " + if (othersCount == 1) "other" else "others"
+                } else ""
+                val emojiText = notification.emoji?.let { " with $it" } ?: ""
+                "$actorName$othersText reacted to your post$emojiText"
+            }
         }
     }
 }
