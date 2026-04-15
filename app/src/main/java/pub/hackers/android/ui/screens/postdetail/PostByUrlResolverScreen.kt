@@ -2,6 +2,7 @@ package pub.hackers.android.ui.screens.postdetail
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -53,9 +54,11 @@ fun PostByUrlResolverScreen(
                     }
                 )
             }
-        ) { innerPadding ->
+        ) { contentPadding ->
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
