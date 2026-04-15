@@ -33,7 +33,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,8 +44,6 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import coil.compose.AsyncImage
-import kotlinx.coroutines.flow.dropWhile
-import kotlinx.coroutines.flow.first
 import pub.hackers.android.R
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
@@ -67,7 +64,6 @@ fun TimelineScreen(
     onRecommendedActorsClick: () -> Unit = {},
     onComposeArticleClick: () -> Unit = {},
     onComposeArticleLongClick: () -> Unit = {},
-    postedAt: Long = 0L,
     tabRetapped: Long = 0L,
     userAvatarUrl: String? = null,
     viewModel: TimelineViewModel = hiltViewModel()
@@ -83,13 +79,10 @@ fun TimelineScreen(
         viewModel.loadDraftCount()
     }
 
-    // After composing a new post, refresh and scroll to top once refresh completes.
-    LaunchedEffect(postedAt) {
-        if (postedAt > 0L) {
-            items.refresh()
-            snapshotFlow { items.loadState.refresh }
-                .dropWhile { it !is LoadState.Loading }
-                .first { it !is LoadState.Loading }
+    // After composing a new post, scroll to top (ViewModel handles cache invalidation).
+    val refreshAt by viewModel.refreshTrigger.refreshAt.collectAsState()
+    LaunchedEffect(refreshAt) {
+        if (refreshAt > 0L) {
             listState.scrollToItem(0)
         }
     }
