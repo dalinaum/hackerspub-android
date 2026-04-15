@@ -76,10 +76,10 @@ fun TimelineScreen(
         viewModel.loadDraftCount()
     }
 
-    // After composing a new post, refresh and scroll to top.
-    LaunchedEffect(Unit) {
-        viewModel.refreshTrigger.requests.collect {
-            items.refresh()
+    // After composing a new post, scroll to top (ViewModel handles cache invalidation).
+    val refreshAt by viewModel.refreshTrigger.refreshAt.collectAsState()
+    LaunchedEffect(refreshAt) {
+        if (refreshAt > 0L) {
             listState.scrollToItem(0)
         }
     }

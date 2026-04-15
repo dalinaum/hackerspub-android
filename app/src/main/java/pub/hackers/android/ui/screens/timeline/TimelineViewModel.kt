@@ -2,7 +2,10 @@ package pub.hackers.android.ui.screens.timeline
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.PagingSource
+import androidx.paging.Pager
 import androidx.paging.cachedIn
 import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,12 +14,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import pub.hackers.android.data.local.PreferencesManager
+import pub.hackers.android.data.paging.CursorPagingSource
 import pub.hackers.android.data.paging.PostOverlayStore
 import pub.hackers.android.data.paging.applyOverlays
-import pub.hackers.android.data.paging.cursorPager
 import pub.hackers.android.data.paging.distinctByEffectiveId
 import pub.hackers.android.data.paging.personalTimelinePage
 import pub.hackers.android.data.repository.HackersPubRepository
@@ -42,9 +46,21 @@ class TimelineViewModel @Inject constructor(
 
     private val overlayStore = PostOverlayStore()
 
+    private var currentPagingSource: PagingSource<String, Post>? = null
+
     val posts: Flow<PagingData<Post>> = combine(
-        cursorPager { after -> repository.personalTimelinePage(after) }
-            .flow
+        Pager(
+            config = PagingConfig(
+                pageSize = 20,
+                prefetchDistance = 5,
+                enablePlaceholders = false,
+                initialLoadSize = 20,
+            ),
+            pagingSourceFactory = {
+                CursorPagingSource<Post> { after -> repository.personalTimelinePage(after) }
+                    .also { currentPagingSource = it }
+            },
+        ).flow
             .distinctByEffectiveId()
             .cachedIn(viewModelScope),
         overlayStore.overlays,
@@ -54,6 +70,11 @@ class TimelineViewModel @Inject constructor(
 
     init {
         loadDraftCount()
+        viewModelScope.launch {
+            refreshTrigger.refreshAt.drop(1).collect {
+                currentPagingSource?.invalidate()
+            }
+        }
     }
 
     fun loadDraftCount() {
