@@ -11,7 +11,7 @@ plugins {
 
 android {
     namespace = "pub.hackers.android"
-    compileSdk = 35
+    compileSdk = 36
 
     signingConfigs {
         create("release") {
@@ -28,7 +28,7 @@ android {
     defaultConfig {
         applicationId = "pub.hackers.android"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 9
         versionName = "1.4.2"
 
