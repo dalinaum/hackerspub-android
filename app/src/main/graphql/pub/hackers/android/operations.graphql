@@ -894,3 +894,38 @@ mutation PublishArticleDraft($id: ID!, $slug: String!, $language: Locale!, $allo
         }
     }
 }
+
+mutation RegisterFcmDeviceToken($input: RegisterFcmDeviceTokenInput!) {
+    registerFcmDeviceToken(input: $input) {
+        ... on RegisterFcmDeviceTokenPayload {
+            deviceToken
+            created
+            updated
+        }
+        ... on RegisterFcmDeviceTokenFailedError {
+            message
+            limit
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
+
+mutation UnregisterFcmDeviceToken($input: UnregisterFcmDeviceTokenInput!) {
+    unregisterFcmDeviceToken(input: $input) {
+        ... on UnregisterFcmDeviceTokenPayload {
+            deviceToken
+            unregistered
+        }
+        ... on InvalidInputError {
+            inputPath
+        }
+        ... on NotAuthenticatedError {
+            notAuthenticated
+        }
+    }
+}
