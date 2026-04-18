@@ -102,6 +102,7 @@ import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
 import pub.hackers.android.ui.components.LargeTitleHeader
+import pub.hackers.android.ui.components.LinkPreviewCard
 import pub.hackers.android.ui.components.LoadingItem
 import pub.hackers.android.ui.components.MediaImage
 import pub.hackers.android.ui.components.PostCard
@@ -629,6 +630,14 @@ internal fun PostDetailContent(
                 if (post.media.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
                     MediaCarousel(media = post.media)
+                }
+
+                if (post.media.isEmpty() && post.quotedPost == null && post.link != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinkPreviewCard(
+                        link = post.link,
+                        onProfileClick = onProfileClick
+                    )
                 }
 
                 if (post.quotedPost != null) {
