@@ -1,5 +1,8 @@
 package pub.hackers.android.ui.screens.editprofile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,15 +37,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.launch
 import pub.hackers.android.R
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
@@ -58,6 +64,19 @@ fun EditProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val colors = LocalAppColors.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val avatarPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                encodeAvatarAsDataUrl(context.contentResolver, uri)
+                    .onSuccess(viewModel::onAvatarPicked)
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -121,6 +140,11 @@ fun EditProfileScreen(
             contentPadding = padding,
             onNameChange = viewModel::onNameChange,
             onBioChange = viewModel::onBioChange,
+            onPickAvatar = {
+                avatarPicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            },
             onLinkAdd = viewModel::onLinkAdd,
             onLinkChange = viewModel::onLinkChange,
             onLinkRemove = viewModel::onLinkRemove,
@@ -135,6 +159,7 @@ private fun EditProfileContent(
     contentPadding: PaddingValues,
     onNameChange: (String) -> Unit,
     onBioChange: (String) -> Unit,
+    onPickAvatar: () -> Unit,
     onLinkAdd: () -> Unit,
     onLinkChange: (Int, String, String) -> Unit,
     onLinkRemove: (Int) -> Unit,
@@ -155,6 +180,7 @@ private fun EditProfileContent(
                 uiState = uiState,
                 onNameChange = onNameChange,
                 onBioChange = onBioChange,
+                onPickAvatar = onPickAvatar,
                 onLinkAdd = onLinkAdd,
                 onLinkChange = onLinkChange,
                 onLinkRemove = onLinkRemove,
@@ -168,6 +194,7 @@ private fun EditProfileForm(
     uiState: EditProfileUiState,
     onNameChange: (String) -> Unit,
     onBioChange: (String) -> Unit,
+    onPickAvatar: () -> Unit,
     onLinkAdd: () -> Unit,
     onLinkChange: (Int, String, String) -> Unit,
     onLinkRemove: (Int) -> Unit,
@@ -184,6 +211,7 @@ private fun EditProfileForm(
     ) {
         AvatarSection(
             avatarUrl = uiState.pendingAvatarDataUrl ?: uiState.avatarUrl,
+            onPickAvatar = onPickAvatar,
         )
 
         OutlinedTextField(
@@ -247,19 +275,34 @@ private fun EditProfileForm(
 }
 
 @Composable
-private fun AvatarSection(avatarUrl: String) {
-    Row(
+private fun AvatarSection(
+    avatarUrl: String,
+    onPickAvatar: () -> Unit,
+) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         AsyncImage(
             model = avatarUrl,
             contentDescription = null,
             modifier = Modifier
                 .size(96.dp)
-                .clip(CircleShape),
+                .clip(CircleShape)
+                .clickable { onPickAvatar() },
             contentScale = ContentScale.Crop,
         )
+        TextButton(onClick = onPickAvatar) {
+            Text(
+                text = stringResource(R.string.edit_profile_change_avatar),
+                color = colors.accent,
+                style = typography.bodyMedium,
+            )
+        }
     }
 }
 
