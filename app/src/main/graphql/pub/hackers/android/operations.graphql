@@ -543,9 +543,7 @@ mutation CreateNote($content: Markdown!, $language: Locale!, $visibility: PostVi
     createNote(input: { content: $content, language: $language, visibility: $visibility, replyTargetId: $replyTargetId, quotedPostId: $quotedPostId }) {
         ... on CreateNotePayload {
             note {
-                id
-                content
-                published
+                ...PostFields
             }
         }
         ... on InvalidInputError {
