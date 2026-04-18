@@ -111,7 +111,7 @@ fun SearchScreen(
                                 color = colors.surface,
                                 shape = RoundedCornerShape(AppShapes.searchBarRadius)
                             )
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -156,7 +156,7 @@ fun SearchScreen(
                 onSelect = { viewModel.setMode(it) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             )
 
             Box(modifier = Modifier.fillMaxSize()) {
