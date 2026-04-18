@@ -14,11 +14,11 @@ import pub.hackers.android.domain.model.Actor
 import pub.hackers.android.domain.model.Post
 import javax.inject.Inject
 
-enum class SearchMode { PEOPLE, POSTS, TAGS }
+enum class SearchMode { ALL, PEOPLE, POSTS, TAGS }
 
 data class SearchUiState(
     val query: String = "",
-    val mode: SearchMode = SearchMode.POSTS,
+    val mode: SearchMode = SearchMode.ALL,
     val actors: List<Actor> = emptyList(),
     val posts: List<Post> = emptyList(),
     val isLoading: Boolean = false,
@@ -84,6 +84,20 @@ class SearchViewModel @Inject constructor(
                 }
 
             when (mode) {
+                SearchMode.ALL -> {
+                    val handleQuery = rawQuery.removePrefix("@")
+                    repository.searchActorsByHandle(handleQuery, limit = 5)
+                        .onSuccess { actors ->
+                            _uiState.update { it.copy(actors = actors) }
+                        }
+                    repository.searchPosts(rawQuery)
+                        .onSuccess { posts ->
+                            _uiState.update { it.copy(posts = posts, isLoading = false) }
+                        }
+                        .onFailure { error ->
+                            _uiState.update { it.copy(error = error.message, isLoading = false) }
+                        }
+                }
                 SearchMode.PEOPLE -> {
                     val handleQuery = rawQuery.removePrefix("@")
                     repository.searchActorsByHandle(handleQuery, limit = 30)

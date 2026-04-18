@@ -170,6 +170,69 @@ fun SearchScreen(
                             onRetry = { viewModel.search() }
                         )
                     }
+                    uiState.mode == SearchMode.ALL -> {
+                        val hasActors = uiState.actors.isNotEmpty()
+                        val hasPosts = uiState.posts.isNotEmpty()
+                        when {
+                            uiState.hasSearched && !hasActors && !hasPosts -> {
+                                ErrorMessage(message = stringResource(R.string.no_results))
+                            }
+                            hasActors || hasPosts -> {
+                                LazyColumn {
+                                    if (hasActors) {
+                                        item(key = "header-actors") {
+                                            SearchSectionHeader(stringResource(R.string.search_people))
+                                        }
+                                        items(
+                                            items = uiState.actors,
+                                            key = { "actor-${it.id}" }
+                                        ) { actor ->
+                                            SearchActorRow(
+                                                actor = actor,
+                                                onClick = { onProfileClick(actor.handle) }
+                                            )
+                                            HorizontalDivider(
+                                                color = colors.divider,
+                                                thickness = 1.dp,
+                                                modifier = Modifier.padding(horizontal = 16.dp)
+                                            )
+                                        }
+                                    }
+                                    if (hasPosts) {
+                                        item(key = "header-posts") {
+                                            SearchSectionHeader(stringResource(R.string.search_posts))
+                                        }
+                                        items(
+                                            items = uiState.posts,
+                                            key = { "post-${it.id}" }
+                                        ) { post ->
+                                            SearchPostItem(
+                                                post = post,
+                                                onPostClick = onPostClick,
+                                                onProfileClick = onProfileClick,
+                                                onReplyClick = onReplyClick,
+                                                onQuoteClick = onQuoteClick,
+                                                onExternalShare = { shareUrl ->
+                                                    val sendIntent = Intent().apply {
+                                                        action = Intent.ACTION_SEND
+                                                        putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                                        type = "text/plain"
+                                                    }
+                                                    context.startActivity(Intent.createChooser(sendIntent, null))
+                                                }
+                                            )
+                                            HorizontalDivider(
+                                                color = colors.divider,
+                                                thickness = 1.dp,
+                                                modifier = Modifier.padding(horizontal = 16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            else -> SearchHint()
+                        }
+                    }
                     uiState.mode == SearchMode.PEOPLE -> {
                         when {
                             uiState.hasSearched && uiState.actors.isEmpty() -> {
@@ -207,26 +270,20 @@ fun SearchScreen(
                                         items = uiState.posts,
                                         key = { it.id }
                                     ) { post ->
-                                        PostCard(
+                                        SearchPostItem(
                                             post = post,
-                                            onClick = { onPostClick(post.sharedPost?.id ?: post.id) },
+                                            onPostClick = onPostClick,
                                             onProfileClick = onProfileClick,
-                                            onReplyClick = { onReplyClick(post.sharedPost?.id ?: post.id) },
-                                            onQuoteClick = { onQuoteClick(post.sharedPost?.id ?: post.id) },
-                                            onReactionClick = null,
-                                            onExternalShareClick = {
-                                                val displayPost = post.sharedPost ?: post
-                                                val shareUrl = displayPost.url ?: displayPost.iri
-                                                if (shareUrl != null) {
-                                                    val sendIntent = Intent().apply {
-                                                        action = Intent.ACTION_SEND
-                                                        putExtra(Intent.EXTRA_TEXT, shareUrl)
-                                                        type = "text/plain"
-                                                    }
-                                                    context.startActivity(Intent.createChooser(sendIntent, null))
+                                            onReplyClick = onReplyClick,
+                                            onQuoteClick = onQuoteClick,
+                                            onExternalShare = { shareUrl ->
+                                                val sendIntent = Intent().apply {
+                                                    action = Intent.ACTION_SEND
+                                                    putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                                    type = "text/plain"
                                                 }
-                                            },
-                                            onQuotedPostClick = onPostClick
+                                                context.startActivity(Intent.createChooser(sendIntent, null))
+                                            }
                                         )
                                         HorizontalDivider(
                                             color = colors.divider,
@@ -255,6 +312,11 @@ private fun SearchModeChips(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        ModeChip(
+            label = stringResource(R.string.search_all),
+            isSelected = selected == SearchMode.ALL,
+            onClick = { onSelect(SearchMode.ALL) }
+        )
         ModeChip(
             label = stringResource(R.string.search_people),
             isSelected = selected == SearchMode.PEOPLE,
@@ -353,4 +415,50 @@ private fun SearchHint() {
             color = colors.textSecondary
         )
     }
+}
+
+@Composable
+private fun SearchSectionHeader(title: String) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = title,
+            style = typography.labelMedium,
+            color = colors.textSecondary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        HorizontalDivider(
+            color = colors.divider,
+            thickness = 1.dp,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+    }
+}
+
+@Composable
+private fun SearchPostItem(
+    post: pub.hackers.android.domain.model.Post,
+    onPostClick: (String) -> Unit,
+    onProfileClick: (String) -> Unit,
+    onReplyClick: (String) -> Unit,
+    onQuoteClick: (String) -> Unit,
+    onExternalShare: (String) -> Unit
+) {
+    PostCard(
+        post = post,
+        onClick = { onPostClick(post.sharedPost?.id ?: post.id) },
+        onProfileClick = onProfileClick,
+        onReplyClick = { onReplyClick(post.sharedPost?.id ?: post.id) },
+        onQuoteClick = { onQuoteClick(post.sharedPost?.id ?: post.id) },
+        onReactionClick = null,
+        onExternalShareClick = {
+            val displayPost = post.sharedPost ?: post
+            val shareUrl = displayPost.url ?: displayPost.iri
+            if (shareUrl != null) {
+                onExternalShare(shareUrl)
+            }
+        },
+        onQuotedPostClick = onPostClick
+    )
 }

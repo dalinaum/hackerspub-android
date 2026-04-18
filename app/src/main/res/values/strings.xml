@@ -97,6 +97,7 @@
     <string name="search_users">Users</string>
     <string name="search_people">People</string>
     <string name="search_tags">Tags</string>
+    <string name="search_all">All</string>
     <string name="search_accounts">Accounts</string>
     <string name="search_recent">Recent Searches</string>
     <string name="search_clear_recent">Clear</string>
