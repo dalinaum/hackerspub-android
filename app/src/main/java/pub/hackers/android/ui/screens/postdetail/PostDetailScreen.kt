@@ -99,6 +99,7 @@ import kotlinx.coroutines.withContext
 import pub.hackers.android.R
 import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.ReactionGroup
+import pub.hackers.android.domain.model.TocItem
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
@@ -110,6 +111,8 @@ import pub.hackers.android.ui.components.MediaImage
 import pub.hackers.android.ui.components.PostCard
 import pub.hackers.android.ui.components.QuotedPostPreview
 import pub.hackers.android.ui.components.ReactionPicker
+import pub.hackers.android.ui.components.TocPanel
+import androidx.compose.foundation.relocation.BringIntoViewRequester
 import pub.hackers.android.ui.theme.AppShapes
 import pub.hackers.android.ui.theme.LocalAppColors
 import pub.hackers.android.ui.theme.LocalAppTypography
@@ -360,6 +363,7 @@ fun PostDetailScreen(
                     PostDetailContent(
                         post = resolvedPost,
                         reactionGroups = uiState.reactionGroups,
+                        toc = uiState.toc,
                         replies = replies,
                         onProfileClick = onProfileClick,
                         onPostClick = onPostClick,
@@ -450,6 +454,7 @@ private fun PostDetailActionMenu(
 internal fun PostDetailContent(
     post: Post,
     reactionGroups: List<ReactionGroup>,
+    toc: List<TocItem>,
     replies: LazyPagingItems<Post>,
     onProfileClick: (String) -> Unit,
     onPostClick: (String) -> Unit,
@@ -575,6 +580,22 @@ internal fun PostDetailContent(
                     }
                 }
 
+                val anchorRequester = remember(post.id) {
+                    val anchors = mutableMapOf<String, BringIntoViewRequester>()
+                    val get: (String) -> BringIntoViewRequester = { id ->
+                        anchors.getOrPut(id) { BringIntoViewRequester() }
+                    }
+                    get
+                }
+
+                if (isArticle && toc.isNotEmpty() && !showTranslated) {
+                    TocPanel(
+                        items = toc,
+                        anchorRequester = anchorRequester,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
                 val translatedText = translatedContent
                 if (showTranslated && translatedText != null) {
                     Text(
@@ -588,7 +609,8 @@ internal fun PostDetailContent(
                         html = post.content,
                         modifier = Modifier.fillMaxWidth(),
                         contentStyle = HtmlContentStyle.Prose,
-                        onMentionClick = onProfileClick
+                        onMentionClick = onProfileClick,
+                        headingAnchor = if (isArticle) anchorRequester else null,
                     )
                 }
 
