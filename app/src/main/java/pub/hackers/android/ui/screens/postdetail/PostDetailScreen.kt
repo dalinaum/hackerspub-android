@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -449,6 +450,7 @@ fun PostDetailScreen(
                 onRetry = { viewModel.loadPost(postId) },
             ) { resolvedPost ->
                 val replies = viewModel.replies.collectAsLazyPagingItems()
+                val localReplies by viewModel.locallyAddedReplies.collectAsState()
                 PullToRefreshBox(
                     isRefreshing = uiState.isRefreshing,
                     onRefresh = {
@@ -461,6 +463,7 @@ fun PostDetailScreen(
                         reactionGroups = uiState.reactionGroups,
                         toc = uiState.toc,
                         replies = replies,
+                        localReplies = localReplies,
                         lazyListState = lazyListState,
                         headingCoords = headingCoords,
                         onBodyPositioned = { bodyItemCoords = it },
@@ -574,6 +577,7 @@ internal fun PostDetailContent(
     onReactionsClick: () -> Unit,
     onExternalShareClick: () -> Unit,
     onWebViewClick: (String) -> Unit = {},
+    localReplies: List<Post> = emptyList(),
 ) {
     val colors = LocalAppColors.current
     val typography = LocalAppTypography.current
@@ -990,7 +994,7 @@ internal fun PostDetailContent(
             }
         }
 
-        if (replies.itemCount > 0) {
+        if (replies.itemCount > 0 || localReplies.isNotEmpty()) {
             item {
                 Text(
                     text = stringResource(R.string.replies),
@@ -1018,6 +1022,19 @@ internal fun PostDetailContent(
                 item {
                     LoadingItem()
                 }
+            }
+
+            items(
+                items = localReplies,
+                key = { reply -> "local-${reply.id}" }
+            ) { reply ->
+                PostCard(
+                    post = reply,
+                    onClick = { onPostClick(reply.id) },
+                    onProfileClick = onProfileClick,
+                    onQuotedPostClick = onPostClick
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = colors.divider)
             }
         }
     }

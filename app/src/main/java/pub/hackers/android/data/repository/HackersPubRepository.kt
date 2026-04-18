@@ -842,24 +842,7 @@ class HackersPubRepository @Inject constructor(
                 val result = response.data?.createNote
                 when {
                     result?.onCreateNotePayload != null -> {
-                        val note = result.onCreateNotePayload.note
-                        Result.success(
-                            Post(
-                                id = note.id,
-                                typename = "Note",
-                                name = null,
-                                published = Instant.parse(note.published.toString()),
-                                summary = null,
-                                content = note.content.toString(),
-                                excerpt = "",
-                                url = null,
-                                viewerHasShared = false,
-                                actor = Actor("", null, "", ""),
-                                media = emptyList(),
-                                engagementStats = EngagementStats(0, 0, 0, 0),
-                                mentions = emptyList()
-                            )
-                        )
+                        Result.success(result.onCreateNotePayload.note.postFields.toPost())
                     }
                     result?.onInvalidInputError != null -> {
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
