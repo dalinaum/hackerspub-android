@@ -40,7 +40,9 @@ class ComposeViewModelTest {
         coEvery { repository.getViewer() } returns Result.success(null)
     }
 
-    private fun newViewModel() = ComposeViewModel(repository, context)
+    private val replyPostedSignal = ReplyPostedSignal()
+
+    private fun newViewModel() = ComposeViewModel(repository, context, replyPostedSignal)
 
     private val sampleActor = Actor(
         id = "actor-1",
