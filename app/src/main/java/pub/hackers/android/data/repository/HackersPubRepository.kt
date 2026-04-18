@@ -19,6 +19,7 @@ import pub.hackers.android.graphql.CompleteLoginChallengeMutation
 import pub.hackers.android.graphql.CreateNoteMutation
 import pub.hackers.android.graphql.DeleteArticleDraftMutation
 import pub.hackers.android.graphql.DeletePostMutation
+import pub.hackers.android.graphql.EditAccountQuery
 import pub.hackers.android.graphql.GetPasskeyAuthenticationOptionsMutation
 import pub.hackers.android.graphql.GetPasskeyRegistrationOptionsMutation
 import pub.hackers.android.graphql.FollowActorMutation
@@ -49,7 +50,10 @@ import pub.hackers.android.graphql.SharePostMutation
 import pub.hackers.android.graphql.UnblockActorMutation
 import pub.hackers.android.graphql.UnfollowActorMutation
 import pub.hackers.android.graphql.UnsharePostMutation
+import pub.hackers.android.graphql.UpdateAccountMutation
 import pub.hackers.android.graphql.ViewerQuery
+import pub.hackers.android.graphql.type.AccountLinkInput
+import pub.hackers.android.graphql.type.UpdateAccountInput
 import pub.hackers.android.graphql.fragment.ActorFields
 import pub.hackers.android.graphql.fragment.EngagementStatsFields
 import pub.hackers.android.graphql.fragment.MediaFields
@@ -488,6 +492,69 @@ class HackersPubRepository @Inject constructor(
                         )
                     }
                 )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getEditableAccount(): Result<EditableAccount> {
+        return try {
+            val response = apolloClient.query(EditAccountQuery())
+                .fetchPolicy(FetchPolicy.NetworkOnly)
+                .execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val viewer = response.data?.viewer
+                    ?: return Result.failure(Exception("Not signed in"))
+                Result.success(
+                    EditableAccount(
+                        id = viewer.id,
+                        name = viewer.name,
+                        bio = viewer.bio.toString(),
+                        avatarUrl = viewer.avatarUrl.toString(),
+                        handle = viewer.handle,
+                        links = viewer.links.map { link ->
+                            EditableAccountLink(name = link.name, url = link.url.toString())
+                        }
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateAccount(
+        id: String,
+        name: String,
+        bio: String,
+        avatarUrl: String?,
+        links: List<EditableAccountLink>,
+    ): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(
+                UpdateAccountMutation(
+                    input = UpdateAccountInput(
+                        id = id,
+                        name = Optional.present(name),
+                        bio = Optional.present(bio),
+                        avatarUrl = if (avatarUrl != null) Optional.present(avatarUrl) else Optional.Absent,
+                        links = Optional.present(
+                            links.map { AccountLinkInput(name = it.name, url = it.url) }
+                        ),
+                    )
+                )
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else if (response.data?.updateAccount?.account == null) {
+                Result.failure(Exception("Update failed"))
+            } else {
+                Result.success(Unit)
             }
         } catch (e: Exception) {
             Result.failure(e)
