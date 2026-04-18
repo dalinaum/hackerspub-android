@@ -43,7 +43,6 @@ fun TocPanel(
     val typography = LocalAppTypography.current
 
     var expanded by remember { mutableStateOf(false) }
-    val baseLevel = remember(items) { items.minOf { it.level } }
 
     Column(
         modifier = modifier
@@ -76,17 +75,29 @@ fun TocPanel(
         }
 
         AnimatedVisibility(visible = expanded) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-            ) {
-                items.forEach { item ->
-                    TocEntry(item = item, baseLevel = baseLevel, onClick = onAnchorClick)
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-            }
+            TocList(
+                items = items,
+                onAnchorClick = onAnchorClick,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            )
         }
+    }
+}
+
+@Composable
+fun TocList(
+    items: List<TocItem>,
+    onAnchorClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (items.isEmpty()) return
+    val baseLevel = remember(items) { items.minOf { it.level } }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        items.forEach { item ->
+            TocEntry(item = item, baseLevel = baseLevel, onClick = onAnchorClick)
+        }
+        Spacer(modifier = Modifier.height(4.dp))
     }
 }
 

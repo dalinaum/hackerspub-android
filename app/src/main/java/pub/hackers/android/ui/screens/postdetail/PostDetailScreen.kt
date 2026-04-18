@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -111,9 +112,12 @@ import pub.hackers.android.ui.components.MediaImage
 import pub.hackers.android.ui.components.PostCard
 import pub.hackers.android.ui.components.QuotedPostPreview
 import pub.hackers.android.ui.components.ReactionPicker
+import pub.hackers.android.ui.components.TocList
 import pub.hackers.android.ui.components.TocPanel
-import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.FormatListBulleted
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -146,6 +150,28 @@ fun PostDetailScreen(
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showShareConfirmation by remember { mutableStateOf(false) }
     var webViewUrl by remember { mutableStateOf<String?>(null) }
+    var showTocSheet by remember { mutableStateOf(false) }
+
+    val screenScope = rememberCoroutineScope()
+    val lazyListState = rememberLazyListState()
+    val headingCoords = remember(postId) { mutableMapOf<String, LayoutCoordinates>() }
+    var bodyItemCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val onAnchorClick: (String) -> Unit = remember(postId) {
+        { id ->
+            val hc = headingCoords[id.substringAfter("--")]
+            val ic = bodyItemCoords
+            if (hc != null && hc.isAttached && ic != null && ic.isAttached) {
+                val offsetInItem = (hc.positionInWindow().y - ic.positionInWindow().y).toInt()
+                screenScope.launch {
+                    lazyListState.animateScrollToItem(0, offsetInItem.coerceAtLeast(0))
+                }
+            }
+        }
+    }
+    val onScrollToTop: () -> Unit = remember(lazyListState, screenScope) {
+        { screenScope.launch { lazyListState.animateScrollToItem(0, 0) } }
+    }
+    val tocAvailable = uiState.post?.typename == "Article" && uiState.toc.isNotEmpty()
 
     // Navigate back after successful deletion
     LaunchedEffect(uiState.isDeleted) {
@@ -161,6 +187,33 @@ fun PostDetailScreen(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             WebViewSheetContent(url = webViewUrl!!)
+        }
+    }
+
+    if (showTocSheet && tocAvailable) {
+        ModalBottomSheet(
+            onDismissRequest = { showTocSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Column(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.table_of_contents),
+                    style = LocalAppTypography.current.titleMedium,
+                    color = colors.textPrimary,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                TocList(
+                    items = uiState.toc,
+                    onAnchorClick = { id ->
+                        showTocSheet = false
+                        onAnchorClick(id)
+                    },
+                )
+            }
         }
     }
 
@@ -313,18 +366,36 @@ fun PostDetailScreen(
                         )
                     }
                 },
-                trailingContent = if (uiState.canDelete) {
+                trailingContent = if (tocAvailable || uiState.canDelete) {
                     {
-                        PostDetailActionMenu(
-                            isDeleting = uiState.isDeleting,
-                            onDelete = {
-                                if (confirmBeforeDelete) {
-                                    showDeleteConfirmation = true
-                                } else {
-                                    viewModel.deletePost()
-                                }
+                        if (tocAvailable) {
+                            IconButton(onClick = { showTocSheet = true }) {
+                                Icon(
+                                    imageVector = Icons.Filled.FormatListBulleted,
+                                    contentDescription = stringResource(R.string.table_of_contents),
+                                    tint = colors.accent,
+                                )
                             }
-                        )
+                            IconButton(onClick = onScrollToTop) {
+                                Icon(
+                                    imageVector = Icons.Filled.KeyboardArrowUp,
+                                    contentDescription = stringResource(R.string.scroll_to_top),
+                                    tint = colors.accent,
+                                )
+                            }
+                        }
+                        if (uiState.canDelete) {
+                            PostDetailActionMenu(
+                                isDeleting = uiState.isDeleting,
+                                onDelete = {
+                                    if (confirmBeforeDelete) {
+                                        showDeleteConfirmation = true
+                                    } else {
+                                        viewModel.deletePost()
+                                    }
+                                }
+                            )
+                        }
                     }
                 } else null
             )
@@ -369,6 +440,10 @@ fun PostDetailScreen(
                         reactionGroups = uiState.reactionGroups,
                         toc = uiState.toc,
                         replies = replies,
+                        lazyListState = lazyListState,
+                        headingCoords = headingCoords,
+                        onBodyPositioned = { bodyItemCoords = it },
+                        onAnchorClick = onAnchorClick,
                         onProfileClick = onProfileClick,
                         onPostClick = onPostClick,
                         onReplyClick = { onReplyClick(postId) },
@@ -460,6 +535,10 @@ internal fun PostDetailContent(
     reactionGroups: List<ReactionGroup>,
     toc: List<TocItem>,
     replies: LazyPagingItems<Post>,
+    lazyListState: LazyListState = rememberLazyListState(),
+    headingCoords: MutableMap<String, LayoutCoordinates> = remember(post.id) { mutableMapOf() },
+    onBodyPositioned: (LayoutCoordinates) -> Unit = {},
+    onAnchorClick: (String) -> Unit = {},
     onProfileClick: (String) -> Unit,
     onPostClick: (String) -> Unit,
     onShareClick: () -> Unit,
@@ -491,24 +570,6 @@ internal fun PostDetailContent(
 
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-    val lazyListState = rememberLazyListState()
-    val headingCoords = remember(post.id) { mutableMapOf<String, LayoutCoordinates>() }
-    var bodyItemCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    val onAnchorClick: (String) -> Unit = remember(post.id) {
-        { id ->
-            // Heading ids in HTML are prefixed with "{docId}--"; TOC JSON uses
-            // bare slugs. Strip on both sides so the lookup is symmetric.
-            val hc = headingCoords[id.substringAfter("--")]
-            val ic = bodyItemCoords
-            if (hc != null && hc.isAttached && ic != null && ic.isAttached) {
-                val offsetInItem = (hc.positionInWindow().y - ic.positionInWindow().y).toInt()
-                scope.launch {
-                    lazyListState.animateScrollToItem(0, offsetInItem.coerceAtLeast(0))
-                }
-            }
-        }
-    }
-
     LazyColumn(
         state = lazyListState,
         contentPadding = PaddingValues(bottom = navBarBottom + 96.dp),
@@ -517,7 +578,7 @@ internal fun PostDetailContent(
             Column(
                 modifier = Modifier
                     .padding(12.dp)
-                    .onGloballyPositioned { bodyItemCoords = it }
+                    .onGloballyPositioned(onBodyPositioned)
             ) {
                 // Reply target preview
                 val replyTarget = post.replyTarget
