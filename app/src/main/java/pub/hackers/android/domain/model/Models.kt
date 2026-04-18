@@ -289,3 +289,19 @@ data class ProfileResult(
     val followsViewer: Boolean = false,
     val viewerBlocks: Boolean = false
 )
+
+@Immutable
+data class EditableAccount(
+    val id: String,
+    val name: String,
+    val bio: String,
+    val avatarUrl: String,
+    val handle: String,
+    val links: List<EditableAccountLink>
+)
+
+@Immutable
+data class EditableAccountLink(
+    val name: String,
+    val url: String
+)
