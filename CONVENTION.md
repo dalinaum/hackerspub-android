@@ -157,6 +157,19 @@ Composable parameters follow the Compose API Guidelines for `Modifier`:
 
 This is an established convention in the project — see commit `0e92f03` (PR #86) which refactored `HtmlContent` specifically to fix a violation, and every `ui/components/*.kt` Composable follows the pattern.
 
+### §5.5 Read configuration from Compose state
+
+When a Composable needs locale / screen / orientation-dependent values from the current Android configuration, read `LocalConfiguration.current` instead of reaching through `LocalContext.current.resources.configuration`.
+
+- `LocalContext.current.resources.configuration` is not tracked as Compose state, so configuration changes can leave the caller with stale values.
+- `LocalConfiguration.current` invalidates and recomposes correctly when the `Configuration` changes.
+- If code only needs resources lookup (`getString`, dimensions, etc.), `stringResource(...)` and other Compose resource APIs remain preferred. Use `LocalConfiguration.current` specifically when you need the `Configuration` object itself.
+
+Reference examples:
+
+- `ui/components/PostCard.kt` translation locale selection
+- `ui/screens/postdetail/PostDetailScreen.kt` translation locale selection
+
 ---
 
 ## §6 ViewModel and state

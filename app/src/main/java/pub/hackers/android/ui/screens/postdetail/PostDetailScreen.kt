@@ -69,8 +69,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -579,6 +579,9 @@ internal fun PostDetailContent(
                 }
 
                 if (!isTranslating && translationError == null) {
+                    // Read Configuration from composition state so locale changes
+                    // trigger recomposition instead of serving stale values.
+                    val configuration = LocalConfiguration.current
                     Text(
                         text = if (showTranslated) stringResource(R.string.show_original) else stringResource(
                             R.string.translate
@@ -597,7 +600,7 @@ internal fun PostDetailContent(
                                     return@clickable
                                 }
                                 val targetLanguageTag = androidx.core.os.ConfigurationCompat
-                                    .getLocales(context.resources.configuration)
+                                    .getLocales(configuration)
                                     .get(0)?.language ?: Locale.getDefault().language
                                 scope.launch {
                                     isTranslating = true
