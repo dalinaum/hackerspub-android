@@ -14,8 +14,11 @@ import pub.hackers.android.domain.model.Actor
 import pub.hackers.android.domain.model.Post
 import javax.inject.Inject
 
+enum class SearchMode { PEOPLE, POSTS, TAGS }
+
 data class SearchUiState(
     val query: String = "",
+    val mode: SearchMode = SearchMode.POSTS,
     val actors: List<Actor> = emptyList(),
     val posts: List<Post> = emptyList(),
     val isLoading: Boolean = false,
@@ -46,56 +49,66 @@ class SearchViewModel @Inject constructor(
         _uiState.update { it.copy(query = query) }
     }
 
+    fun setMode(mode: SearchMode) {
+        if (_uiState.value.mode == mode) return
+        _uiState.update { it.copy(mode = mode) }
+        if (_uiState.value.hasSearched && _uiState.value.query.isNotBlank()) {
+            search()
+        }
+    }
+
     fun search() {
-        val query = _uiState.value.query.trim()
-        if (query.isEmpty()) return
+        val rawQuery = _uiState.value.query.trim()
+        if (rawQuery.isEmpty()) return
+        val mode = _uiState.value.mode
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true, resolvedObjectUrl = null, actors = emptyList()) }
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    error = null,
+                    hasSearched = true,
+                    resolvedObjectUrl = null,
+                    actors = emptyList(),
+                    posts = emptyList()
+                )
+            }
 
-            // Save to recent searches
-            preferencesManager.addRecentSearch(query)
+            preferencesManager.addRecentSearch(rawQuery)
 
-            // Try searchObject first for URL/handle resolution
-            repository.searchObject(query)
+            repository.searchObject(rawQuery)
                 .onSuccess { url ->
                     if (url != null) {
                         _uiState.update { it.copy(resolvedObjectUrl = url) }
                     }
                 }
 
-            // Search actors if query looks like a handle
-            if (query.startsWith("@") || query.contains("@")) {
-                val handleQuery = query.removePrefix("@")
-                repository.searchActorsByHandle(handleQuery, limit = 5)
-                    .onSuccess { actors ->
-                        _uiState.update { it.copy(actors = actors) }
+            when (mode) {
+                SearchMode.PEOPLE -> {
+                    val handleQuery = rawQuery.removePrefix("@")
+                    repository.searchActorsByHandle(handleQuery, limit = 30)
+                        .onSuccess { actors ->
+                            _uiState.update { it.copy(actors = actors, isLoading = false) }
+                        }
+                        .onFailure { error ->
+                            _uiState.update { it.copy(error = error.message, isLoading = false) }
+                        }
+                }
+                SearchMode.POSTS, SearchMode.TAGS -> {
+                    val postQuery = if (mode == SearchMode.TAGS && !rawQuery.startsWith("#")) {
+                        "#$rawQuery"
+                    } else {
+                        rawQuery
                     }
+                    repository.searchPosts(postQuery)
+                        .onSuccess { posts ->
+                            _uiState.update { it.copy(posts = posts, isLoading = false) }
+                        }
+                        .onFailure { error ->
+                            _uiState.update { it.copy(error = error.message, isLoading = false) }
+                        }
+                }
             }
-
-            // Always search posts too
-            repository.searchPosts(query)
-                .onSuccess { posts ->
-                    // Deduplicate: remove actors whose IDs appear in post authors
-                    val postActorIds = posts.map { it.actor.id }.toSet()
-                    val dedupedActors = _uiState.value.actors.filter { it.id !in postActorIds }
-
-                    _uiState.update {
-                        it.copy(
-                            posts = posts,
-                            actors = dedupedActors,
-                            isLoading = false
-                        )
-                    }
-                }
-                .onFailure { error ->
-                    _uiState.update {
-                        it.copy(
-                            error = error.message,
-                            isLoading = false
-                        )
-                    }
-                }
         }
     }
 
@@ -105,7 +118,7 @@ class SearchViewModel @Inject constructor(
 
     fun clearSearch() {
         _uiState.update {
-            SearchUiState(recentSearches = it.recentSearches)
+            SearchUiState(recentSearches = it.recentSearches, mode = it.mode)
         }
     }
 
