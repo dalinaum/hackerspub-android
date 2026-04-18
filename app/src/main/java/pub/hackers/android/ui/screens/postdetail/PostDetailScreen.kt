@@ -10,13 +10,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -101,6 +104,7 @@ import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
 import pub.hackers.android.ui.components.HtmlContentStyle
 import pub.hackers.android.ui.components.LargeTitleHeader
+import pub.hackers.android.ui.components.LinkPreviewCard
 import pub.hackers.android.ui.components.LoadingItem
 import pub.hackers.android.ui.components.MediaImage
 import pub.hackers.android.ui.components.PostCard
@@ -476,7 +480,11 @@ internal fun PostDetailContent(
             .withZone(ZoneId.systemDefault())
     }
 
-    LazyColumn {
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+    LazyColumn(
+        contentPadding = PaddingValues(bottom = navBarBottom + 96.dp)
+    ) {
         item {
             Column(
                 modifier = Modifier.padding(12.dp)
@@ -647,6 +655,14 @@ internal fun PostDetailContent(
                 if (post.media.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
                     MediaCarousel(media = post.media)
+                }
+
+                if (post.media.isEmpty() && post.quotedPost == null && post.link != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinkPreviewCard(
+                        link = post.link,
+                        onProfileClick = onProfileClick
+                    )
                 }
 
                 if (post.quotedPost != null) {
