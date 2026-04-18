@@ -9,8 +9,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.runtime.Composable
@@ -37,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import pub.hackers.android.ui.theme.AppShapes
 import pub.hackers.android.ui.theme.LocalAppColors
 import pub.hackers.android.ui.theme.LocalAppTypography
 import pub.hackers.android.ui.theme.UbuntuMonoFontFamily
@@ -60,6 +65,7 @@ internal sealed class ContentBlock {
     data class Code(val codeHtml: String) : ContentBlock()
     data class List(val html: String) : ContentBlock()
     data class Heading(val level: Int, val anchorId: String?, val innerHtml: String) : ContentBlock()
+    data class Image(val src: String, val alt: String?) : ContentBlock()
 }
 
 @VisibleForTesting
@@ -82,6 +88,13 @@ private val PRE_CODE_REGEX = Regex(
 )
 private val HEADING_REGEX = Regex(
     """<h([1-6])([^>]*)>([\s\S]*?)</h\1>""",
+    RegexOption.IGNORE_CASE
+)
+// Matches `<img ...>` (including self-closing `/>`), optionally wrapped in
+// a `<p>` that contains nothing else. The outer wrapper is consumed so the
+// image extraction doesn't leave stray empty paragraphs in the text stream.
+private val IMG_BLOCK_REGEX = Regex(
+    """(?:<p[^>]*>\s*)?<img\b([^>]*?)/?>(?:\s*</p>)?""",
     RegexOption.IGNORE_CASE
 )
 private val EMPTY_PARAGRAPH_REGEX = Regex(
@@ -311,6 +324,18 @@ fun HtmlContent(
                             codeHtml = block.codeHtml
                         )
                     }
+                    is ContentBlock.Image -> {
+                        // TODO: animated GIFs show only the first frame until we add the
+                        // `io.coil-kt.coil3:coil-gif` module and register AnimatedImageDecoder.
+                        AsyncImage(
+                            model = block.src,
+                            contentDescription = block.alt,
+                            contentScale = ContentScale.FillWidth,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(AppShapes.mediaRadius))
+                        )
+                    }
                     is ContentBlock.Heading -> {
                         val headingAnnotated = rememberParsedHtml(
                             block.innerHtml,
@@ -494,11 +519,38 @@ internal fun splitIntoBlocks(html: String, splitHeadings: Boolean = false): List
         blocks.addAll(splitTextAndListBlocks(source))
     }
 
-    if (!splitHeadings) return blocks
+    val withImages = blocks.flatMap { block ->
+        if (block is ContentBlock.Text) extractImageBlocks(block.html) else listOf(block)
+    }
 
-    return blocks.flatMap { block ->
+    if (!splitHeadings) return withImages
+
+    return withImages.flatMap { block ->
         if (block is ContentBlock.Text) extractHeadingBlocks(block.html) else listOf(block)
     }
+}
+
+private fun extractImageBlocks(html: String): List<ContentBlock> {
+    val out = mutableListOf<ContentBlock>()
+    var cursor = 0
+    for (match in IMG_BLOCK_REGEX.findAll(html)) {
+        if (match.range.first > cursor) {
+            val before = html.substring(cursor, match.range.first)
+            if (before.isNotBlank()) out.add(ContentBlock.Text(before))
+        }
+        val attrs = parseAttributes(match.groupValues[1])
+        val src = attrs["src"]
+        if (!src.isNullOrBlank()) {
+            out.add(ContentBlock.Image(src = src, alt = attrs["alt"]?.takeIf { it.isNotBlank() }))
+        }
+        cursor = match.range.last + 1
+    }
+    if (cursor < html.length) {
+        val tail = html.substring(cursor)
+        if (tail.isNotBlank()) out.add(ContentBlock.Text(tail))
+    }
+    if (out.isEmpty()) out.add(ContentBlock.Text(html))
+    return out
 }
 
 private fun extractHeadingBlocks(html: String): List<ContentBlock> {
@@ -1199,5 +1251,6 @@ private fun blockSpacing(previous: ContentBlock, current: ContentBlock) = when {
     previous is ContentBlock.List || current is ContentBlock.List -> 16.dp
     current is ContentBlock.Heading -> 16.dp
     previous is ContentBlock.Heading -> 8.dp
+    previous is ContentBlock.Image || current is ContentBlock.Image -> 12.dp
     else -> 0.dp
 }
