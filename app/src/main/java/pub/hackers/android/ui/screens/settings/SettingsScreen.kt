@@ -66,6 +66,7 @@ fun SettingsScreen(
     onProfileClick: (String) -> Unit,
     onNavigateBack: () -> Unit,
     onDraftsClick: () -> Unit = {},
+    onLicensesClick: () -> Unit = {},
     isLoggedIn: Boolean,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -379,6 +380,28 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
                     text = stringResource(R.string.clear_cache),
+                    style = typography.bodyLarge,
+                    color = colors.textPrimary
+                )
+            }
+
+            HorizontalDivider(color = colors.divider, thickness = 1.dp)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onLicensesClick() }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.Article,
+                    contentDescription = null,
+                    tint = colors.textSecondary
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = stringResource(R.string.licenses),
                     style = typography.bodyLarge,
                     color = colors.textPrimary
                 )
