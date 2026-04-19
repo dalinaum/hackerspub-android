@@ -1,0 +1,141 @@
+name: Lint
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run lintDebug
+        run: ./gradlew lintDebug --console=plain 2>&1 | tee lint.log
+        continue-on-error: true
+
+      - name: Collect changed files
+        id: changed
+        run: |
+          set -euo pipefail
+          HEAD_SHA="${{ github.sha }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BEFORE="${{ github.event.before }}"
+            ZERO="0000000000000000000000000000000000000000"
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = "$ZERO" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              BASE="${HEAD_SHA}^"
+            else
+              BASE="$BEFORE"
+            fi
+          fi
+          git diff --name-only "$BASE" "$HEAD_SHA" > changed.txt
+          echo "changed files:"
+          cat changed.txt
+
+      - name: Emit annotations
+        shell: python
+        run: |
+          import os, re, sys
+          import xml.etree.ElementTree as ET
+
+          workspace = os.environ.get("GITHUB_WORKSPACE", "")
+
+          # None = no changed-files list available, annotate everything.
+          # set()  = list was produced but empty, annotate nothing.
+          changed = None
+          try:
+              with open("changed.txt") as f:
+                  changed = {line.strip() for line in f if line.strip()}
+          except FileNotFoundError:
+              pass
+
+          errors = 0
+          warnings = 0
+
+          def emit(sev, path, line, col, msg):
+              global errors, warnings
+              if workspace and path.startswith(workspace + "/"):
+                  path = path[len(workspace) + 1:]
+              if changed is not None and path not in changed:
+                  return
+              if sev == "error":
+                  errors += 1
+              elif sev == "warning":
+                  warnings += 1
+              msg = msg.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              loc = f"file={path},line={line}"
+              if col:
+                  loc += f",col={col}"
+              print(f"::{sev} {loc}::{msg}")
+
+          # Kotlin compiler diagnostics from the Gradle console log.
+          compiler_pattern = re.compile(
+              r"^(?P<sev>[we]):\s+file://(?P<path>[^:]+):(?P<line>\d+):(?P<col>\d+)\s+(?P<msg>.*)$"
+          )
+          try:
+              with open("lint.log", "r", errors="replace") as f:
+                  for raw in f:
+                      m = compiler_pattern.match(raw.rstrip("\n"))
+                      if not m:
+                          continue
+                      sev = "error" if m.group("sev") == "e" else "warning"
+                      emit(sev, m.group("path"), m.group("line"), m.group("col"), m.group("msg"))
+          except FileNotFoundError:
+              pass
+
+          # Android Lint issues from the XML report. The text report drops
+          # column info and the console only prints a summary, so the XML is
+          # the authoritative source for inline annotations.
+          severity_map = {
+              "Fatal": "error",
+              "Error": "error",
+              "Warning": "warning",
+              "Informational": "notice",
+          }
+          lint_xml = "app/build/reports/lint-results-debug.xml"
+          if os.path.exists(lint_xml):
+              tree = ET.parse(lint_xml)
+              for issue in tree.getroot().findall("issue"):
+                  sev = severity_map.get(issue.get("severity", ""), "warning")
+                  if sev == "notice":
+                      continue
+                  base_msg = issue.get("message", "").strip()
+                  issue_id = issue.get("id", "")
+                  msg = f"{base_msg} [{issue_id}]" if issue_id else base_msg
+                  for loc in issue.findall("location"):
+                      path = loc.get("file", "")
+                      if not path:
+                          continue
+                      emit(sev, path, loc.get("line") or "1", loc.get("column") or "", msg)
+
+          print(f"::notice::Lint (changed files) — errors: {errors}, warnings: {warnings}")
+          sys.exit(1 if errors > 0 else 0)
+
+      - name: Upload lint log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-log
+          path: lint.log
