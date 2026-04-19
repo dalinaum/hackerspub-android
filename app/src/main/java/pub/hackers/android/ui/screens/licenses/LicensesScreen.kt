@@ -1,6 +1,7 @@
 package pub.hackers.android.ui.screens.licenses
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -26,6 +27,7 @@ fun LicensesScreen(
     onNavigateBack: () -> Unit
 ) {
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(R.string.licenses)) },
