@@ -183,6 +183,18 @@ Reference examples:
 - Passkey sign-in uses the `PasskeyManager`'s injected application context instead of threading an `Activity` through `SignInScreen` / `SignInViewModel`.
 - Passkey registration accepts a `Context` from `SettingsScreen` only where Credential Manager registration is initiated.
 
+### §5.7 Do not read frequently changing state in composition
+
+Values annotated with `@FrequentlyChangingValue` should not be read directly in Composable function bodies. Reading them during composition makes that composition depend on high-frequency updates and can cause avoidable recompositions.
+
+- Use `derivedStateOf` only when the derived result changes much less often than the source value, such as reducing scroll position to "at top" / "not at top".
+- Use `snapshotFlow` inside `LaunchedEffect` when a frequently changing value needs to drive state updates or side effects without being read directly by composition.
+- Prefer layout- or draw-phase reads, such as lambda-based modifiers, when the value only affects placement or drawing.
+
+Reference example:
+
+- `ui/screens/compose/ComposeScreen.kt` mention autocomplete observes text-field scroll with `snapshotFlow` and feeds a calculated popup offset into composition.
+
 ---
 
 ## §6 ViewModel and state
