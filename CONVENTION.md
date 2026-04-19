@@ -296,6 +296,14 @@ The `debug` build type sets `applicationIdSuffix = ".dev"` and ships a distinct 
 
 `release` build type has `isMinifyEnabled = true`. Don't disable minification to "make debugging easier" — add the missing keep rule instead.
 
+### §10.5 Run lint before pushing
+
+Run `./gradlew :app:lintDebug` after finishing each task and again right before `git push`. The target is **0 errors** — warnings are tolerated but new warnings should be justified in the PR body.
+
+Lint catches problems that `compileDebugKotlin` and unit tests do not: manifest issues, API-level traps (§13), resource hygiene, and typographic issues. Compilation passing does not mean lint passes.
+
+For a **genuine false positive** (e.g., the AGP 9.1.1 `Instantiatable` bug on `@AndroidEntryPoint` activities), suppress narrowly at the single call site with `tools:ignore="..."` or a `//noinspection` comment, and cite the upstream issue in the commit message. Do not disable a check globally via `lintOptions { disable ... }` — it hides future real failures of the same kind.
+
 ---
 
 ## §11 Localization and accessibility
@@ -373,6 +381,7 @@ AI code-completion tools frequently suggest API calls that match the intent but 
 | §6.3 | One-shot events → `Channel` / `SharedFlow` |
 | §7.1 | Repository returns `Result<T>` |
 | §10.1 | Dependencies → Version Catalog |
+| §10.5 | Run `./gradlew :app:lintDebug` before pushing; target 0 errors |
 | §11.1 | No hardcoded user-facing strings |
 | §11.2 | `contentDescription` on interactive icons |
 | §12.2 | Don't commit generated Apollo code |
