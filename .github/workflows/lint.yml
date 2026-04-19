@@ -36,13 +36,21 @@ jobs:
       - name: Collect changed files
         id: changed
         run: |
+          set -euo pipefail
+          HEAD_SHA="${{ github.sha }}"
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE="${{ github.event.pull_request.base.sha }}"
-            HEAD="${{ github.event.pull_request.head.sha }}"
-            git diff --name-only "$BASE" "$HEAD" > changed.txt
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
           else
-            git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" > changed.txt || true
+            BEFORE="${{ github.event.before }}"
+            ZERO="0000000000000000000000000000000000000000"
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = "$ZERO" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              BASE="${HEAD_SHA}^"
+            else
+              BASE="$BEFORE"
+            fi
           fi
+          git diff --name-only "$BASE" "$HEAD_SHA" > changed.txt
           echo "changed files:"
           cat changed.txt
 
@@ -53,13 +61,12 @@ jobs:
 
           workspace = os.environ.get("GITHUB_WORKSPACE", "")
 
-          changed = set()
+          # None = no changed-files list available, annotate everything.
+          # set()  = list was produced but empty, annotate nothing.
+          changed = None
           try:
               with open("changed.txt") as f:
-                  for line in f:
-                      line = line.strip()
-                      if line:
-                          changed.add(line)
+                  changed = {line.strip() for line in f if line.strip()}
           except FileNotFoundError:
               pass
 
@@ -78,7 +85,7 @@ jobs:
                   path = m.group("path")
                   if workspace and path.startswith(workspace + "/"):
                       path = path[len(workspace) + 1:]
-                  if changed and path not in changed:
+                  if changed is not None and path not in changed:
                       continue
                   sev = "error" if m.group("sev") == "e" else "warning"
                   if sev == "error":
