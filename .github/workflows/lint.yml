@@ -47,8 +47,8 @@ jobs:
           cat changed.txt
 
       - name: Emit annotations
+        shell: python
         run: |
-          python3 - <<'PY'
           import os, re, sys
 
           workspace = os.environ.get("GITHUB_WORKSPACE", "")
@@ -95,7 +95,6 @@ jobs:
 
           print(f"::notice::Lint (changed files) — errors: {errors}, warnings: {warnings}")
           sys.exit(1 if errors > 0 else 0)
-          PY
 
       - name: Upload lint log
         if: always()
