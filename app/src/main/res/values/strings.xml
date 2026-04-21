@@ -115,6 +115,7 @@
     <string name="failed_to_bookmark">Failed to bookmark</string>
     <string name="failed_to_remove_bookmark">Failed to remove bookmark</string>
     <string name="no_bookmarks">No bookmarks yet</string>
+    <string name="no_bookmarks_description">Posts and articles you save will show up here.</string>
     <string name="all">All</string>
     <string name="articles">Articles</string>
     <string name="notes">Notes</string>

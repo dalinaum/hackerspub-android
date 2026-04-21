@@ -7,15 +7,19 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.LoadState
@@ -158,14 +163,13 @@ fun BookmarksScreen(
                         )
                     }
 
-                    items.itemCount == 0 && refresh is LoadState.NotLoading && refresh.endOfPaginationReached -> {
-                        ErrorMessage(
-                            message = stringResource(R.string.no_bookmarks),
+                    items.itemCount == 0 && refresh is LoadState.NotLoading -> {
+                        BookmarksEmptyState(
                             onRefresh = { items.refresh() }
                         )
                     }
 
-                    items.itemCount == 0 -> {
+                    refresh is LoadState.Loading && items.itemCount == 0 -> {
                         FullScreenLoading()
                     }
 
@@ -248,6 +252,47 @@ fun BookmarksScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BookmarksEmptyState(
+    onRefresh: () -> Unit,
+) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Bookmark,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = colors.bookmark,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.no_bookmarks),
+            style = typography.bodyLargeSemiBold,
+            color = colors.textPrimary,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.no_bookmarks_description),
+            style = typography.bodyMedium,
+            color = colors.textSecondary,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        androidx.compose.material3.Button(onClick = onRefresh) {
+            Text(stringResource(R.string.refresh))
         }
     }
 }
