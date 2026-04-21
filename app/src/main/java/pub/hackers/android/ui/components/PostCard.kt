@@ -635,7 +635,7 @@ private fun BookmarkEngagementButton(
     onClick: (() -> Unit)?,
 ) {
     val colors = LocalAppColors.current
-    val tint = if (isBookmarked) colors.accent else colors.textSecondary
+    val tint = if (isBookmarked) colors.bookmark else colors.textSecondary
 
     Box(
         contentAlignment = Alignment.Center,

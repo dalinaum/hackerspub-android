@@ -999,7 +999,7 @@ internal fun PostDetailContent(
                         Icon(
                             imageVector = if (post.viewerHasBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                             contentDescription = stringResource(R.string.bookmark),
-                            tint = if (post.viewerHasBookmarked) colors.accent else colors.textSecondary
+                            tint = if (post.viewerHasBookmarked) colors.bookmark else colors.textSecondary
                         )
                     }
                     IconButton(onClick = onQuoteClick) {

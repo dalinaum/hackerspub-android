@@ -284,7 +284,7 @@ private fun ArticleEngagementBar(
             Icon(
                 imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                 contentDescription = stringResource(R.string.bookmark),
-                tint = if (isBookmarked) colors.accent else colors.textSecondary
+                tint = if (isBookmarked) colors.bookmark else colors.textSecondary
             )
         }
         if (onExternalShareClick != null) {
