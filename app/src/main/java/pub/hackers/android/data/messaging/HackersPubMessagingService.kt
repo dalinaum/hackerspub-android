@@ -15,6 +15,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import pub.hackers.android.HackersPubApplication
 import pub.hackers.android.MainActivity
@@ -32,6 +33,11 @@ class HackersPubMessagingService : FirebaseMessagingService() {
     lateinit var notificationStateManager: NotificationStateManager
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun onDestroy() {
+        serviceScope.cancel()
+        super.onDestroy()
+    }
 
     override fun onNewToken(token: String) {
         serviceScope.launch {
