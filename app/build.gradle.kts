@@ -1,17 +1,17 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
     alias(libs.plugins.apollo)
     alias(libs.plugins.google.services)
     alias(libs.plugins.firebase.crashlytics)
+    alias(libs.plugins.aboutlibraries)
 }
 
 android {
     namespace = "pub.hackers.android"
-    compileSdk = 35
+    compileSdk = 36
 
     signingConfigs {
         create("release") {
@@ -28,9 +28,9 @@ android {
     defaultConfig {
         applicationId = "pub.hackers.android"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 9
-        versionName = "1.4.2"
+        targetSdk = 36
+        versionCode = 10
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -56,12 +56,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
+        resValues = true
     }
 
     testOptions {
@@ -121,6 +118,7 @@ dependencies {
     implementation(libs.androidx.paging.compose)
 
     implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
 
@@ -132,9 +130,11 @@ dependencies {
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.messaging)
 
-    implementation("androidx.browser:browser:1.8.0")
-    implementation("androidx.credentials:credentials:1.5.0-rc01")
-    implementation("androidx.credentials:credentials-play-services-auth:1.5.0-rc01")
+    implementation(libs.androidx.browser)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+
+    implementation(libs.aboutlibraries.compose.m3)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

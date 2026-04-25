@@ -4,27 +4,29 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.text.Html
 import android.webkit.WebView
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.paging.LoadState
-import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.itemKey
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,11 +34,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.outlined.AddReaction
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Lock
@@ -70,12 +74,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -83,7 +89,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
+import coil3.compose.AsyncImage
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.nl.languageid.LanguageIdentification
 import com.google.mlkit.nl.translate.TranslateLanguage
@@ -96,15 +106,27 @@ import kotlinx.coroutines.withContext
 import pub.hackers.android.R
 import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.ReactionGroup
+import pub.hackers.android.domain.model.TocItem
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
+import pub.hackers.android.ui.components.HtmlContentStyle
 import pub.hackers.android.ui.components.LargeTitleHeader
+import pub.hackers.android.ui.components.LinkPreviewCard
 import pub.hackers.android.ui.components.LoadingItem
 import pub.hackers.android.ui.components.MediaImage
 import pub.hackers.android.ui.components.PostCard
 import pub.hackers.android.ui.components.QuotedPostPreview
 import pub.hackers.android.ui.components.ReactionPicker
+import pub.hackers.android.ui.components.TocList
+import pub.hackers.android.ui.components.TocPanel
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.FormatListBulleted
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import pub.hackers.android.ui.theme.AppShapes
 import pub.hackers.android.ui.theme.LocalAppColors
 import pub.hackers.android.ui.theme.LocalAppTypography
@@ -126,6 +148,8 @@ fun PostDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val bookmarkedMessage = stringResource(R.string.bookmarked)
+    val bookmarkRemovedMessage = stringResource(R.string.bookmark_removed)
     val colors = LocalAppColors.current
     val confirmBeforeDelete by viewModel.preferencesManager.confirmBeforeDelete.collectAsState(
         initial = true
@@ -134,6 +158,45 @@ fun PostDetailScreen(
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showShareConfirmation by remember { mutableStateOf(false) }
     var webViewUrl by remember { mutableStateOf<String?>(null) }
+    var showTocSheet by remember { mutableStateOf(false) }
+
+    val screenScope = rememberCoroutineScope()
+    val lazyListState = rememberLazyListState()
+    val headingCoords = remember(postId) { mutableMapOf<String, LayoutCoordinates>() }
+    var bodyItemCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val onAnchorClick: (String) -> Unit = remember(postId) {
+        { id ->
+            val hc = headingCoords[id.substringAfter("--")]
+            val ic = bodyItemCoords
+            if (hc != null && hc.isAttached && ic != null && ic.isAttached) {
+                val offsetInItem = (hc.positionInWindow().y - ic.positionInWindow().y).toInt()
+                screenScope.launch {
+                    lazyListState.animateScrollToItem(0, offsetInItem.coerceAtLeast(0))
+                }
+            }
+        }
+    }
+    val onScrollToTop: () -> Unit = remember(lazyListState, screenScope) {
+        { screenScope.launch { lazyListState.animateScrollToItem(0, 0) } }
+    }
+    val tocAvailable = uiState.post?.typename == "Article" && uiState.toc.isNotEmpty()
+
+    var activeHeadingId by remember(postId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(lazyListState, postId) {
+        snapshotFlow {
+            lazyListState.firstVisibleItemIndex to lazyListState.firstVisibleItemScrollOffset
+        }.collect { (firstIdx, scrollOffset) ->
+            val body = bodyItemCoords
+            val offsets = if (body != null && body.isAttached) {
+                headingCoords.entries.mapNotNull { (id, coords) ->
+                    if (!coords.isAttached) null
+                    else id to body.localPositionOf(coords, Offset.Zero).y
+                }.toMap()
+            } else emptyMap()
+            val active = computeActiveHeadingId(offsets, firstIdx, scrollOffset)
+            if (active != activeHeadingId) activeHeadingId = active
+        }
+    }
 
     // Navigate back after successful deletion
     LaunchedEffect(uiState.isDeleted) {
@@ -149,6 +212,35 @@ fun PostDetailScreen(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             WebViewSheetContent(url = webViewUrl!!)
+        }
+    }
+
+    if (showTocSheet && tocAvailable) {
+        ModalBottomSheet(
+            onDismissRequest = { showTocSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Column(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.table_of_contents),
+                    style = LocalAppTypography.current.titleMedium,
+                    color = colors.textPrimary,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                TocList(
+                    items = uiState.toc,
+                    onAnchorClick = { id ->
+                        showTocSheet = false
+                        onAnchorClick(id)
+                    },
+                    activeId = activeHeadingId,
+                )
+            }
         }
     }
 
@@ -181,6 +273,26 @@ fun PostDetailScreen(
                     onProfileClick(handle)
                 },
                 onClose = { viewModel.dismissSharesSheet() }
+            )
+        }
+    }
+
+    // Reactors bottom sheet
+    if (uiState.showReactorsSheet && uiState.reactionGroups.isNotEmpty()) {
+        val initialIndex = uiState.selectedReactionGroup
+            ?.let { selected -> uiState.reactionGroups.indexOf(selected).coerceAtLeast(0) }
+            ?: 0
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.dismissReactorsSheet() },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            ReactorsSheet(
+                groups = uiState.reactionGroups,
+                initialIndex = initialIndex,
+                onProfileClick = { handle ->
+                    viewModel.dismissReactorsSheet()
+                    onProfileClick(handle)
+                }
             )
         }
     }
@@ -281,18 +393,36 @@ fun PostDetailScreen(
                         )
                     }
                 },
-                trailingContent = if (uiState.canDelete) {
+                trailingContent = if (tocAvailable || uiState.canDelete) {
                     {
-                        PostDetailActionMenu(
-                            isDeleting = uiState.isDeleting,
-                            onDelete = {
-                                if (confirmBeforeDelete) {
-                                    showDeleteConfirmation = true
-                                } else {
-                                    viewModel.deletePost()
-                                }
+                        if (tocAvailable) {
+                            IconButton(onClick = { showTocSheet = true }) {
+                                Icon(
+                                    imageVector = Icons.Filled.FormatListBulleted,
+                                    contentDescription = stringResource(R.string.table_of_contents),
+                                    tint = colors.accent,
+                                )
                             }
-                        )
+                            IconButton(onClick = onScrollToTop) {
+                                Icon(
+                                    imageVector = Icons.Filled.KeyboardArrowUp,
+                                    contentDescription = stringResource(R.string.scroll_to_top),
+                                    tint = colors.accent,
+                                )
+                            }
+                        }
+                        if (uiState.canDelete) {
+                            PostDetailActionMenu(
+                                isDeleting = uiState.isDeleting,
+                                onDelete = {
+                                    if (confirmBeforeDelete) {
+                                        showDeleteConfirmation = true
+                                    } else {
+                                        viewModel.deletePost()
+                                    }
+                                }
+                            )
+                        }
                     }
                 } else null
             )
@@ -302,7 +432,7 @@ fun PostDetailScreen(
                 FloatingActionButton(
                     onClick = { onReplyClick(postId) },
                     containerColor = colors.composeAccent,
-                    contentColor = Color.White
+                    contentColor = colors.composeOnAccent
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Reply,
@@ -325,6 +455,7 @@ fun PostDetailScreen(
                 onRetry = { viewModel.loadPost(postId) },
             ) { resolvedPost ->
                 val replies = viewModel.replies.collectAsLazyPagingItems()
+                val localReplies by viewModel.locallyAddedReplies.collectAsState()
                 PullToRefreshBox(
                     isRefreshing = uiState.isRefreshing,
                     onRefresh = {
@@ -335,7 +466,14 @@ fun PostDetailScreen(
                     PostDetailContent(
                         post = resolvedPost,
                         reactionGroups = uiState.reactionGroups,
+                        toc = uiState.toc,
                         replies = replies,
+                        localReplies = localReplies,
+                        lazyListState = lazyListState,
+                        headingCoords = headingCoords,
+                        onBodyPositioned = { bodyItemCoords = it },
+                        onAnchorClick = onAnchorClick,
+                        activeHeadingId = activeHeadingId,
                         onProfileClick = onProfileClick,
                         onPostClick = onPostClick,
                         onReplyClick = { onReplyClick(postId) },
@@ -350,11 +488,28 @@ fun PostDetailScreen(
                                 }
                             }
                         },
-                        onReactionClick = { emoji -> viewModel.toggleReaction(emoji) },
+                        onReactionClick = { group -> viewModel.showReactorsSheet(group) },
                         onReactionPickerClick = { viewModel.toggleReactionPicker() },
+                        onBookmarkClick = if (isLoggedIn) {
+                            {
+                                Toast.makeText(
+                                    context,
+                                    if (resolvedPost.viewerHasBookmarked) {
+                                        bookmarkRemovedMessage
+                                    } else {
+                                        bookmarkedMessage
+                                    },
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                viewModel.toggleBookmark()
+                            }
+                        } else {
+                            null
+                        },
                         onQuoteClick = { onQuoteClick(postId) },
                         onSharesClick = { viewModel.showSharesSheet() },
                         onQuotesClick = { viewModel.showQuotesSheet() },
+                        onReactionsClick = { viewModel.showAllReactors() },
                         onExternalShareClick = {
                             val shareUrl = uiState.post?.url
                                 ?: uiState.post?.iri
@@ -424,18 +579,27 @@ private fun PostDetailActionMenu(
 internal fun PostDetailContent(
     post: Post,
     reactionGroups: List<ReactionGroup>,
+    toc: List<TocItem>,
     replies: LazyPagingItems<Post>,
+    lazyListState: LazyListState = rememberLazyListState(),
+    headingCoords: MutableMap<String, LayoutCoordinates> = remember(post.id) { mutableMapOf() },
+    onBodyPositioned: (LayoutCoordinates) -> Unit = {},
+    onAnchorClick: (String) -> Unit = {},
+    activeHeadingId: String? = null,
     onProfileClick: (String) -> Unit,
     onPostClick: (String) -> Unit,
     onShareClick: () -> Unit,
     onReplyClick: () -> Unit,
-    onReactionClick: (String) -> Unit,
+    onReactionClick: (ReactionGroup) -> Unit,
     onReactionPickerClick: () -> Unit,
+    onBookmarkClick: (() -> Unit)?,
     onQuoteClick: () -> Unit,
     onSharesClick: () -> Unit,
     onQuotesClick: () -> Unit,
+    onReactionsClick: () -> Unit,
     onExternalShareClick: () -> Unit,
     onWebViewClick: (String) -> Unit = {},
+    localReplies: List<Post> = emptyList(),
 ) {
     val colors = LocalAppColors.current
     val typography = LocalAppTypography.current
@@ -453,10 +617,17 @@ internal fun PostDetailContent(
             .withZone(ZoneId.systemDefault())
     }
 
-    LazyColumn {
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+    LazyColumn(
+        state = lazyListState,
+        contentPadding = PaddingValues(bottom = navBarBottom + 96.dp),
+    ) {
         item {
             Column(
-                modifier = Modifier.padding(12.dp)
+                modifier = Modifier
+                    .padding(12.dp)
+                    .onGloballyPositioned(onBodyPositioned)
             ) {
                 // Reply target preview
                 val replyTarget = post.replyTarget
@@ -544,6 +715,20 @@ internal fun PostDetailContent(
                     }
                 }
 
+                val onHeadingPositioned: (String, LayoutCoordinates) -> Unit =
+                    remember(post.id) {
+                        { id, coords -> headingCoords[id] = coords }
+                    }
+
+                if (isArticle && toc.isNotEmpty() && !showTranslated) {
+                    TocPanel(
+                        items = toc,
+                        onAnchorClick = onAnchorClick,
+                        activeId = activeHeadingId,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
                 val translatedText = translatedContent
                 if (showTranslated && translatedText != null) {
                     Text(
@@ -556,7 +741,9 @@ internal fun PostDetailContent(
                     HtmlContent(
                         html = post.content,
                         modifier = Modifier.fillMaxWidth(),
-                        onMentionClick = onProfileClick
+                        contentStyle = HtmlContentStyle.Prose,
+                        onMentionClick = onProfileClick,
+                        onHeadingPositioned = if (isArticle) onHeadingPositioned else null,
                     )
                 }
 
@@ -580,6 +767,9 @@ internal fun PostDetailContent(
                 }
 
                 if (!isTranslating && translationError == null) {
+                    // Read Configuration from composition state so locale changes
+                    // trigger recomposition instead of serving stale values.
+                    val configuration = LocalConfiguration.current
                     Text(
                         text = if (showTranslated) stringResource(R.string.show_original) else stringResource(
                             R.string.translate
@@ -598,7 +788,7 @@ internal fun PostDetailContent(
                                     return@clickable
                                 }
                                 val targetLanguageTag = androidx.core.os.ConfigurationCompat
-                                    .getLocales(context.resources.configuration)
+                                    .getLocales(configuration)
                                     .get(0)?.language ?: Locale.getDefault().language
                                 scope.launch {
                                     isTranslating = true
@@ -623,6 +813,14 @@ internal fun PostDetailContent(
                 if (post.media.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
                     MediaCarousel(media = post.media)
+                }
+
+                if (post.media.isEmpty() && post.quotedPost == null && post.link != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinkPreviewCard(
+                        link = post.link,
+                        onProfileClick = onProfileClick
+                    )
                 }
 
                 if (post.quotedPost != null) {
@@ -707,7 +905,8 @@ internal fun PostDetailContent(
                     Text(
                         text = "${post.engagementStats.reactions} ${stringResource(R.string.reactions)}",
                         style = typography.labelMedium,
-                        color = colors.textSecondary
+                        color = colors.accent,
+                        modifier = Modifier.clickable { onReactionsClick() }
                     )
                     Text(
                         text = "${post.engagementStats.quotes} ${stringResource(R.string.quotes)}",
@@ -722,9 +921,7 @@ internal fun PostDetailContent(
                     Row {
                         reactionGroups.forEach { group ->
                             Card(
-                                onClick = {
-                                    group.emoji?.let { onReactionClick(it) }
-                                },
+                                onClick = { onReactionClick(group) },
                                 shape = RoundedCornerShape(AppShapes.reactionPillRadius),
                                 colors = CardDefaults.cardColors(
                                     containerColor = if (group.viewerHasReacted)
@@ -802,6 +999,15 @@ internal fun PostDetailContent(
                                 colors.textSecondary
                         )
                     }
+                    if (onBookmarkClick != null) {
+                        IconButton(onClick = onBookmarkClick) {
+                            Icon(
+                                imageVector = if (post.viewerHasBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                contentDescription = stringResource(R.string.bookmark),
+                                tint = if (post.viewerHasBookmarked) colors.bookmark else colors.textSecondary
+                            )
+                        }
+                    }
                     IconButton(onClick = onQuoteClick) {
                         Icon(
                             imageVector = Icons.Outlined.FormatQuote,
@@ -822,7 +1028,7 @@ internal fun PostDetailContent(
             }
         }
 
-        if (replies.itemCount > 0) {
+        if (replies.itemCount > 0 || localReplies.isNotEmpty()) {
             item {
                 Text(
                     text = stringResource(R.string.replies),
@@ -849,6 +1055,141 @@ internal fun PostDetailContent(
             if (replies.loadState.append is LoadState.Loading) {
                 item {
                     LoadingItem()
+                }
+            }
+
+            items(
+                items = localReplies,
+                key = { reply -> "local-${reply.id}" }
+            ) { reply ->
+                PostCard(
+                    post = reply,
+                    onClick = { onPostClick(reply.id) },
+                    onProfileClick = onProfileClick,
+                    onQuotedPostClick = onPostClick
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = colors.divider)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReactorsSheet(
+    groups: List<ReactionGroup>,
+    initialIndex: Int,
+    onProfileClick: (String) -> Unit
+) {
+    val colors = LocalAppColors.current
+    val typography = LocalAppTypography.current
+    val safeInitial = initialIndex.coerceIn(0, (groups.size - 1).coerceAtLeast(0))
+    var selectedIndex by remember(groups) { mutableIntStateOf(safeInitial) }
+    val selectedGroup = groups.getOrNull(selectedIndex)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.reactors),
+            style = typography.bodyLargeSemiBold,
+            color = colors.textPrimary,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        if (groups.isEmpty() || selectedGroup == null) {
+            Text(
+                text = stringResource(R.string.no_reactors),
+                style = typography.bodyMedium,
+                color = colors.textSecondary,
+                modifier = Modifier.padding(vertical = 24.dp)
+            )
+            return@Column
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            groups.forEachIndexed { index, group ->
+                val isSelected = index == selectedIndex
+                Card(
+                    onClick = { selectedIndex = index },
+                    shape = RoundedCornerShape(AppShapes.reactionPillRadius),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected)
+                            colors.accent.copy(alpha = 0.2f)
+                        else
+                            colors.surface
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (group.emoji != null) {
+                            Text(text = group.emoji)
+                        } else if (group.customEmoji != null) {
+                            AsyncImage(
+                                model = group.customEmoji.imageUrl,
+                                contentDescription = group.customEmoji.name,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = group.count.toString(),
+                            style = typography.labelMedium,
+                            color = if (isSelected) colors.accent else colors.textPrimary
+                        )
+                    }
+                }
+            }
+        }
+
+        if (selectedGroup.reactors.isEmpty()) {
+            Text(
+                text = stringResource(R.string.no_reactors),
+                style = typography.bodyMedium,
+                color = colors.textSecondary,
+                modifier = Modifier.padding(vertical = 24.dp)
+            )
+        } else {
+            selectedGroup.reactors.forEach { actor ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onProfileClick(actor.handle) }
+                        .padding(vertical = 8.dp)
+                ) {
+                    AsyncImage(
+                        model = actor.avatarUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        pub.hackers.android.ui.components.RichDisplayName(
+                            name = actor.name,
+                            fallback = actor.handle,
+                            style = typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = actor.handle,
+                            style = typography.labelMedium,
+                            color = colors.textSecondary
+                        )
+                    }
                 }
             }
         }
@@ -1226,7 +1567,11 @@ private fun WebViewSheetContent(url: String) {
                     }
 
                     webViewClient = object : android.webkit.WebViewClient() {
-                        override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                        override fun onPageStarted(
+                            view: WebView?,
+                            url: String?,
+                            favicon: android.graphics.Bitmap?
+                        ) {
                             isLoading = true
                         }
 
@@ -1251,4 +1596,26 @@ private fun WebViewSheetContent(url: String) {
             modifier = Modifier.fillMaxSize()
         )
     }
+}
+
+/**
+ * Last heading whose top has scrolled to or above the viewport top is "active".
+ * Offsets are in pixels relative to the body item's top; scroll offsets come
+ * from [androidx.compose.foundation.lazy.LazyListState].
+ */
+internal fun computeActiveHeadingId(
+    headingOffsetsInBody: Map<String, Float>,
+    firstVisibleItemIndex: Int,
+    firstVisibleItemScrollOffset: Int,
+): String? {
+    if (headingOffsetsInBody.isEmpty()) return null
+    val scrollPast = if (firstVisibleItemIndex > 0) {
+        Float.MAX_VALUE
+    } else {
+        firstVisibleItemScrollOffset.toFloat()
+    }
+    return headingOffsetsInBody.entries
+        .filter { (_, y) -> y <= scrollPast }
+        .maxByOrNull { (_, y) -> y }
+        ?.key
 }

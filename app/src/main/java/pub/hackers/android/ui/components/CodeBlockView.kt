@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
@@ -26,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import pub.hackers.android.ui.theme.UbuntuMonoFontFamily
 
 private val SPAN_REGEX = Regex("""<span([^>]*)>([\s\S]*?)</span>""")
 private val STYLE_ATTR_REGEX = Regex("""style=["']([^"']*)["']""")
@@ -112,7 +112,7 @@ fun CodeBlockView(
     ) {
         Text(
             text = annotatedCode,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = UbuntuMonoFontFamily,
             fontSize = 13.sp,
             lineHeight = 19.sp,
             color = defaultTextColor,

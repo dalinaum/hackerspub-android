@@ -50,7 +50,8 @@ data class ComposeUiState(
 @HiltViewModel
 class ComposeViewModel @Inject constructor(
     private val repository: HackersPubRepository,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val replyPostedSignal: ReplyPostedSignal,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ComposeUiState())
@@ -217,8 +218,8 @@ class ComposeViewModel @Inject constructor(
                         it.copy(
                             replyTargetPost = post,
                             isLoadingReplyTarget = false,
-                            content = mentionPrefix,
-                            cursorPosition = mentionPrefix.length
+                            content = if (it.content.isBlank()) mentionPrefix else it.content,
+                            cursorPosition = if (it.content.isBlank()) mentionPrefix.length else it.cursorPosition
                         )
                     }
                 }
@@ -297,7 +298,10 @@ class ComposeViewModel @Inject constructor(
                 replyTargetId = state.replyToId,
                 quotedPostId = state.quotedPostId
             )
-                .onSuccess {
+                .onSuccess { newPost ->
+                    state.replyToId?.let { replyTargetId ->
+                        replyPostedSignal.emit(ReplyPostedEvent(replyTargetId, newPost))
+                    }
                     _uiState.update { it.copy(isPosting = false, isPosted = true) }
                 }
                 .onFailure { error ->

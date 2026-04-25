@@ -23,6 +23,8 @@ import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.PostDetailResult
 import pub.hackers.android.domain.model.ReactionGroup
 import pub.hackers.android.testutil.MainDispatcherRule
+import pub.hackers.android.ui.screens.compose.ReplyPostedEvent
+import pub.hackers.android.ui.screens.compose.ReplyPostedSignal
 import java.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -77,9 +79,17 @@ class PostDetailViewModelTest {
         )
     }
 
+    private val replyPostedSignal = ReplyPostedSignal()
+
     private fun newViewModel(): PostDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("postId" to defaultPostId))
-        return PostDetailViewModel(repository, sessionManager, preferencesManager, savedStateHandle)
+        return PostDetailViewModel(
+            repository,
+            sessionManager,
+            preferencesManager,
+            replyPostedSignal,
+            savedStateHandle,
+        )
     }
 
     // region initial load
@@ -216,6 +226,53 @@ class PostDetailViewModelTest {
         vm.dismissDeleteError()
 
         assertNull(vm.uiState.value.deleteError)
+    }
+
+    // endregion
+
+    // region optimistic reply append
+
+    @Test
+    fun `reply event targeting this post appends to locallyAddedReplies`() = runTest {
+        stubLoadPostSuccess(samplePost(id = defaultPostId))
+        val vm = newViewModel()
+        advanceUntilIdle()
+
+        val reply = samplePost(id = "reply-1")
+        replyPostedSignal.emit(ReplyPostedEvent(defaultPostId, reply))
+        advanceUntilIdle()
+
+        assertEquals(listOf(reply), vm.locallyAddedReplies.value)
+        assertEquals(1, vm.uiState.value.post?.engagementStats?.replies)
+    }
+
+    @Test
+    fun `reply event targeting a different post is ignored`() = runTest {
+        stubLoadPostSuccess(samplePost(id = defaultPostId))
+        val vm = newViewModel()
+        advanceUntilIdle()
+
+        replyPostedSignal.emit(ReplyPostedEvent("other-post", samplePost(id = "reply-1")))
+        advanceUntilIdle()
+
+        assertTrue(vm.locallyAddedReplies.value.isEmpty())
+        assertEquals(0, vm.uiState.value.post?.engagementStats?.replies)
+    }
+
+    @Test
+    fun `refresh clears locallyAddedReplies`() = runTest {
+        stubLoadPostSuccess(samplePost(id = defaultPostId))
+        val vm = newViewModel()
+        advanceUntilIdle()
+
+        replyPostedSignal.emit(ReplyPostedEvent(defaultPostId, samplePost(id = "reply-1")))
+        advanceUntilIdle()
+        assertEquals(1, vm.locallyAddedReplies.value.size)
+
+        vm.refresh()
+        advanceUntilIdle()
+
+        assertTrue(vm.locallyAddedReplies.value.isEmpty())
     }
 
     // endregion

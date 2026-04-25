@@ -22,11 +22,15 @@ import pub.hackers.android.data.repository.HackersPubRepository
 import pub.hackers.android.domain.model.Actor
 import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.ReactionGroup
+import pub.hackers.android.domain.model.TocItem
+import pub.hackers.android.ui.bookmark.BookmarkMutationCoordinator
+import pub.hackers.android.ui.screens.compose.ReplyPostedSignal
 import javax.inject.Inject
 
 data class PostDetailUiState(
     val post: Post? = null,
     val reactionGroups: List<ReactionGroup> = emptyList(),
+    val toc: List<TocItem> = emptyList(),
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val error: String? = null,
@@ -42,6 +46,8 @@ data class PostDetailUiState(
     val showQuotesSheet: Boolean = false,
     val quotePosts: List<Post> = emptyList(),
     val isLoadingQuotes: Boolean = false,
+    val showReactorsSheet: Boolean = false,
+    val selectedReactionGroup: ReactionGroup? = null,
 )
 
 @HiltViewModel
@@ -49,6 +55,7 @@ class PostDetailViewModel @Inject constructor(
     private val repository: HackersPubRepository,
     private val sessionManager: SessionManager,
     val preferencesManager: PreferencesManager,
+    private val replyPostedSignal: ReplyPostedSignal,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -56,6 +63,33 @@ class PostDetailViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(PostDetailUiState())
     val uiState: StateFlow<PostDetailUiState> = _uiState.asStateFlow()
+    private val bookmarkCoordinator = BookmarkMutationCoordinator(
+        scope = viewModelScope,
+        requestMutation = { targetPostId, shouldBookmark ->
+            if (shouldBookmark) repository.bookmarkPost(targetPostId)
+            else repository.unbookmarkPost(targetPostId)
+        },
+        applyDesiredState = { targetPostId, isBookmarked ->
+            _uiState.update { state ->
+                val post = state.post
+                if (post == null || post.id != targetPostId) state
+                else state.copy(post = post.copy(viewerHasBookmarked = isBookmarked))
+            }
+        },
+        revertFailedState = { targetPostId, attemptedState ->
+            _uiState.update { state ->
+                val post = state.post
+                if (post == null || post.id != targetPostId) state
+                else state.copy(post = post.copy(viewerHasBookmarked = !attemptedState))
+            }
+        },
+    )
+
+    // Locally-composed replies appended optimistically after a successful reply
+    // from this screen. Rendered after the paginated replies; cleared on refresh
+    // so the server-authoritative list wins.
+    private val _locallyAddedReplies = MutableStateFlow<List<Post>>(emptyList())
+    val locallyAddedReplies: StateFlow<List<Post>> = _locallyAddedReplies.asStateFlow()
 
     // Replies are paginated independently of the main post payload. The main
     // post, reactionGroups, and sheet/delete/translation state stay in UiState
@@ -69,6 +103,27 @@ class PostDetailViewModel @Inject constructor(
 
     init {
         loadPost(postId)
+        viewModelScope.launch {
+            replyPostedSignal.events.collect { event ->
+                if (event.replyTargetId == postId) {
+                    appendLocalReply(event.reply)
+                }
+            }
+        }
+    }
+
+    private fun appendLocalReply(reply: Post) {
+        _locallyAddedReplies.update { it + reply }
+        _uiState.update { state ->
+            val post = state.post ?: return@update state
+            state.copy(
+                post = post.copy(
+                    engagementStats = post.engagementStats.copy(
+                        replies = post.engagementStats.replies + 1
+                    )
+                )
+            )
+        }
     }
 
     fun loadPost(id: String) {
@@ -86,6 +141,7 @@ class PostDetailViewModel @Inject constructor(
                         it.copy(
                             post = result.post,
                             reactionGroups = result.reactionGroups,
+                            toc = result.toc,
                             isLoading = false,
                             canDelete = canDelete
                         )
@@ -103,6 +159,7 @@ class PostDetailViewModel @Inject constructor(
     }
 
     fun refresh() {
+        _locallyAddedReplies.value = emptyList()
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
 
@@ -117,6 +174,7 @@ class PostDetailViewModel @Inject constructor(
                         it.copy(
                             post = result.post,
                             reactionGroups = result.reactionGroups,
+                            toc = result.toc,
                             isRefreshing = false,
                             canDelete = canDelete
                         )
@@ -230,6 +288,29 @@ class PostDetailViewModel @Inject constructor(
 
     fun dismissQuotesSheet() {
         _uiState.update { it.copy(showQuotesSheet = false) }
+    }
+
+    fun showReactorsSheet(group: ReactionGroup) {
+        _uiState.update {
+            it.copy(showReactorsSheet = true, selectedReactionGroup = group)
+        }
+    }
+
+    fun showAllReactors() {
+        _uiState.update {
+            it.copy(showReactorsSheet = true, selectedReactionGroup = null)
+        }
+    }
+
+    fun dismissReactorsSheet() {
+        _uiState.update {
+            it.copy(showReactorsSheet = false, selectedReactionGroup = null)
+        }
+    }
+
+    fun toggleBookmark() {
+        val post = _uiState.value.post ?: return
+        bookmarkCoordinator.toggle(post.id, post.viewerHasBookmarked)
     }
 
     fun toggleReaction(emoji: String) {

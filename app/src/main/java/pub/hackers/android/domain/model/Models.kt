@@ -78,6 +78,7 @@ data class Post(
     val url: String?,
     val iri: String? = null,
     val viewerHasShared: Boolean,
+    val viewerHasBookmarked: Boolean = false,
     val actor: Actor,
     val media: List<Media>,
     val link: PostLink? = null,
@@ -244,7 +245,16 @@ data class PostDetailResult(
     val reactionGroups: List<ReactionGroup>,
     val replies: List<Post>,
     val hasMoreReplies: Boolean,
-    val repliesEndCursor: String?
+    val repliesEndCursor: String?,
+    val toc: List<TocItem> = emptyList(),
+)
+
+@Immutable
+data class TocItem(
+    val id: String,
+    val level: Int,
+    val title: String,
+    val children: List<TocItem>,
 )
 
 @Immutable
@@ -288,4 +298,20 @@ data class ProfileResult(
     val viewerFollows: Boolean = false,
     val followsViewer: Boolean = false,
     val viewerBlocks: Boolean = false
+)
+
+@Immutable
+data class EditableAccount(
+    val id: String,
+    val name: String,
+    val bio: String,
+    val avatarUrl: String,
+    val handle: String,
+    val links: List<EditableAccountLink>
+)
+
+@Immutable
+data class EditableAccountLink(
+    val name: String,
+    val url: String
 )

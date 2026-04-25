@@ -150,6 +150,7 @@ class PostDetailContentTest {
                 PostDetailContent(
                     post = post,
                     reactionGroups = emptyList(),
+                    toc = emptyList(),
                     replies = replies,
                     onProfileClick = {},
                     onPostClick = {},
@@ -157,9 +158,11 @@ class PostDetailContentTest {
                     onReplyClick = {},
                     onReactionClick = {},
                     onReactionPickerClick = {},
+                    onBookmarkClick = {},
                     onQuoteClick = {},
                     onSharesClick = {},
                     onQuotesClick = {},
+                    onReactionsClick = {},
                     onExternalShareClick = {},
                 )
             }

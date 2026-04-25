@@ -1,8 +1,9 @@
 package pub.hackers.android.ui.screens.timeline
 
 import android.content.Intent
-import androidx.compose.foundation.background
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -43,7 +44,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import pub.hackers.android.R
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
@@ -72,6 +73,8 @@ fun TimelineScreen(
     val items = viewModel.posts.collectAsLazyPagingItems()
     val listState = rememberLazyListState()
     val context = LocalContext.current
+    val bookmarkedMessage = stringResource(R.string.bookmarked)
+    val bookmarkRemovedMessage = stringResource(R.string.bookmark_removed)
     val colors = LocalAppColors.current
 
     // Refresh draft count when screen becomes visible (e.g., returning from Drafts)
@@ -199,7 +202,7 @@ fun TimelineScreen(
             FloatingActionButton(
                 onClick = { onComposeClick(null) },
                 containerColor = colors.composeAccent,
-                contentColor = androidx.compose.ui.graphics.Color.White
+                contentColor = colors.composeOnAccent
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -263,6 +266,19 @@ fun TimelineScreen(
                                     onReactionClick = { viewModel.toggleFavourite(post) },
                                     onReactionLongPress = {
                                         viewModel.showReactionPicker(post.sharedPost?.id ?: post.id)
+                                    },
+                                    onBookmarkClick = {
+                                        val displayPost = post.sharedPost ?: post
+                                        Toast.makeText(
+                                            context,
+                                            if (displayPost.viewerHasBookmarked) {
+                                                bookmarkRemovedMessage
+                                            } else {
+                                                bookmarkedMessage
+                                            },
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        viewModel.toggleBookmark(post)
                                     },
                                     onExternalShareClick = {
                                         val displayPost = post.sharedPost ?: post

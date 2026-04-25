@@ -65,15 +65,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.LoadState
+import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.Flow
-import androidx.paging.PagingData
 import pub.hackers.android.R
-import pub.hackers.android.domain.model.Post
 import pub.hackers.android.domain.model.AccountLink
 import pub.hackers.android.domain.model.ActorField
+import pub.hackers.android.domain.model.Post
 import pub.hackers.android.ui.components.ErrorMessage
 import pub.hackers.android.ui.components.FullScreenLoading
 import pub.hackers.android.ui.components.HtmlContent
@@ -93,10 +93,20 @@ fun ProfileScreen(
     onProfileClick: (String) -> Unit = {},
     onReplyClick: (String) -> Unit = {},
     onQuoteClick: (String) -> Unit = {},
+    onEditProfileClick: () -> Unit = {},
+    refreshSignal: Boolean = false,
+    onRefreshConsumed: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
+
+    androidx.compose.runtime.LaunchedEffect(refreshSignal) {
+        if (refreshSignal) {
+            viewModel.refresh()
+            onRefreshConsumed()
+        }
+    }
     val listState = rememberLazyListState()
     val context = LocalContext.current
     val colors = LocalAppColors.current
@@ -231,6 +241,7 @@ fun ProfileScreen(
                                 isPerformingAction = uiState.isPerformingAction,
                                 onFollowClick = { viewModel.followActor() },
                                 onUnfollowClick = { viewModel.unfollowActor() },
+                                onEditProfileClick = onEditProfileClick,
                                 onMentionClick = onProfileClick
                             )
                         }
@@ -277,7 +288,11 @@ fun ProfileScreen(
                                         post = post,
                                         onClick = { onPostClick(post.sharedPost?.id ?: post.id) },
                                         onProfileClick = onProfileClick,
-                                        onReplyClick = { onReplyClick(post.sharedPost?.id ?: post.id) },
+                                        onReplyClick = {
+                                            onReplyClick(
+                                                post.sharedPost?.id ?: post.id
+                                            )
+                                        },
                                         onShareClick = {
                                             val targetId = post.sharedPost?.id ?: post.id
                                             if (post.viewerHasShared) {
@@ -286,7 +301,11 @@ fun ProfileScreen(
                                                 viewModel.sharePost(targetId)
                                             }
                                         },
-                                        onQuoteClick = { onQuoteClick(post.sharedPost?.id ?: post.id) },
+                                        onQuoteClick = {
+                                            onQuoteClick(
+                                                post.sharedPost?.id ?: post.id
+                                            )
+                                        },
                                         onReactionClick = null,
                                         onExternalShareClick = {
                                             val displayPost = post.sharedPost ?: post
@@ -569,6 +588,7 @@ private fun ProfileHeader(
     isPerformingAction: Boolean,
     onFollowClick: () -> Unit,
     onUnfollowClick: () -> Unit,
+    onEditProfileClick: () -> Unit = {},
     onMentionClick: (String) -> Unit = {}
 ) {
     val colors = LocalAppColors.current
@@ -614,6 +634,24 @@ private fun ProfileHeader(
                 followsViewer = followsViewer,
                 viewerBlocks = viewerBlocks
             )
+        }
+
+        if (isViewer) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = onEditProfileClick,
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.5.dp, colors.buttonOutline),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = colors.accent
+                )
+            ) {
+                Text(
+                    text = stringResource(R.string.edit_profile),
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+            }
         }
 
         if (!isViewer) {

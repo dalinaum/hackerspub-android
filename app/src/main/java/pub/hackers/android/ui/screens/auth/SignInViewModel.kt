@@ -1,16 +1,20 @@
 package pub.hackers.android.ui.screens.auth
 
 import android.app.Activity
+import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import pub.hackers.android.R
 import pub.hackers.android.data.auth.PasskeyManager
 import pub.hackers.android.data.local.SessionManager
 import pub.hackers.android.data.repository.HackersPubRepository
@@ -36,7 +40,8 @@ data class SignInUiState(
 class SignInViewModel @Inject constructor(
     private val repository: HackersPubRepository,
     private val sessionManager: SessionManager,
-    private val passkeyManager: PasskeyManager
+    private val passkeyManager: PasskeyManager,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SignInUiState())
@@ -147,7 +152,7 @@ class SignInViewModel @Inject constructor(
     }
 
     @RequiresApi(Build.VERSION_CODES.P)
-    fun signInWithPasskey(activity: Activity) {
+    fun signInWithPasskey() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
@@ -159,7 +164,7 @@ class SignInViewModel @Inject constructor(
                     .getOrThrow()
                 android.util.Log.d("PasskeyAuth", "Step 2: Got options: $optionsJson")
 
-                val authResponse = passkeyManager.authenticate(optionsJson, activity)
+                val authResponse = passkeyManager.authenticate(optionsJson)
                 android.util.Log.d("PasskeyAuth", "Step 3: Got auth response: $authResponse")
 
                 val authResponseMap = jsonToMap(org.json.JSONObject(authResponse))
@@ -178,6 +183,14 @@ class SignInViewModel @Inject constructor(
                     avatarUrl = session.account.avatarUrl
                 )
                 _uiState.update { it.copy(isLoading = false, isSignedIn = true) }
+            } catch (e: NoCredentialException) {
+                android.util.Log.w("PasskeyAuth", "No passkey registered", e)
+                _uiState.update {
+                    it.copy(
+                        error = context.getString(R.string.no_passkey_registered),
+                        isLoading = false
+                    )
+                }
             } catch (e: Exception) {
                 android.util.Log.e("PasskeyAuth", "Passkey auth failed", e)
                 _uiState.update {

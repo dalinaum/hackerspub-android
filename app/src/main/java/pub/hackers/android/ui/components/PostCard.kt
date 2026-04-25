@@ -36,9 +36,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FormatQuote
@@ -67,6 +69,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
@@ -75,7 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.nl.languageid.LanguageIdentification
 import com.google.mlkit.nl.translate.TranslateLanguage
@@ -106,6 +109,7 @@ fun PostCard(
     onQuoteClick: (() -> Unit)? = null,
     onReactionClick: (() -> Unit)? = null,
     onReactionLongPress: (() -> Unit)? = null,
+    onBookmarkClick: (() -> Unit)? = null,
     onExternalShareClick: (() -> Unit)? = null,
     onQuotedPostClick: ((String) -> Unit)? = null,
     contentMaxLength: Int = 0
@@ -122,6 +126,7 @@ fun PostCard(
             onQuoteClick = onQuoteClick,
             onReactionClick = onReactionClick,
             onReactionLongPress = onReactionLongPress,
+            onBookmarkClick = onBookmarkClick,
             onExternalShareClick = onExternalShareClick,
             modifier = modifier
         )
@@ -135,6 +140,7 @@ fun PostCard(
             onQuoteClick = onQuoteClick,
             onReactionClick = onReactionClick,
             onReactionLongPress = onReactionLongPress,
+            onBookmarkClick = onBookmarkClick,
             onExternalShareClick = onExternalShareClick,
             onQuotedPostClick = onQuotedPostClick,
             contentMaxLength = contentMaxLength,
@@ -154,6 +160,7 @@ private fun NoteCard(
     onQuoteClick: (() -> Unit)? = null,
     onReactionClick: (() -> Unit)? = null,
     onReactionLongPress: (() -> Unit)? = null,
+    onBookmarkClick: (() -> Unit)? = null,
     onExternalShareClick: (() -> Unit)? = null,
     onQuotedPostClick: ((String) -> Unit)? = null,
     contentMaxLength: Int = 0
@@ -405,6 +412,9 @@ private fun NoteCard(
 
                 // Inline translate link
                 if (!isTranslating && translationError == null) {
+                    // Read Configuration from composition state so locale changes
+                    // trigger recomposition instead of serving stale values.
+                    val configuration = LocalConfiguration.current
                     Text(
                         text = if (showTranslated) stringResource(R.string.show_original) else stringResource(
                             R.string.translate
@@ -425,7 +435,7 @@ private fun NoteCard(
                                 }
 
                                 val targetLanguageTag = androidx.core.os.ConfigurationCompat
-                                    .getLocales(context.resources.configuration)
+                                    .getLocales(configuration)
                                     .get(0)?.language ?: Locale.getDefault().language
                                 scope.launch {
                                     isTranslating = true
@@ -537,6 +547,7 @@ private fun NoteCard(
                     onQuoteClick = onQuoteClick,
                     onReactionClick = onReactionClick,
                     onReactionLongPress = onReactionLongPress,
+                    onBookmarkClick = onBookmarkClick,
                     onExternalShareClick = onExternalShareClick
                 )
             }
@@ -553,12 +564,14 @@ private fun EngagementBar(
     onQuoteClick: (() -> Unit)? = null,
     onReactionClick: (() -> Unit)? = null,
     onReactionLongPress: (() -> Unit)? = null,
+    onBookmarkClick: (() -> Unit)? = null,
     onExternalShareClick: (() -> Unit)? = null
 ) {
     val colors = LocalAppColors.current
     val isReplied = post.engagementStats.replies > 0 && post.replyTarget != null
     val isShared = post.viewerHasShared
     val isReacted = post.reactionGroups.any { it.viewerHasReacted }
+    val isBookmarked = post.viewerHasBookmarked
 
     Row(
         modifier = Modifier
@@ -592,6 +605,13 @@ private fun EngagementBar(
             onLongClick = onReactionLongPress
         )
 
+        if (onBookmarkClick != null) {
+            BookmarkEngagementButton(
+                isBookmarked = isBookmarked,
+                onClick = onBookmarkClick,
+            )
+        }
+
         Spacer(modifier = Modifier.weight(1f))
 
         // External share — always textSecondary, offset back to align right edge
@@ -608,6 +628,30 @@ private fun EngagementBar(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun BookmarkEngagementButton(
+    isBookmarked: Boolean,
+    onClick: (() -> Unit)?,
+) {
+    val colors = LocalAppColors.current
+    val tint = if (isBookmarked) colors.bookmark else colors.textSecondary
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
+    ) {
+        Icon(
+            imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+            contentDescription = stringResource(R.string.bookmark),
+            tint = tint,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -1246,8 +1290,8 @@ internal fun formatRelativeTime(instant: Instant): String {
 private fun formatCount(count: Int): String {
     return when {
         count < 1000 -> count.toString()
-        count < 1_000_000 -> String.format("%.1fK", count / 1000.0)
-        else -> String.format("%.1fM", count / 1_000_000.0)
+        count < 1_000_000 -> String.format(Locale.ROOT, "%.1fK", count / 1000.0)
+        else -> String.format(Locale.ROOT, "%.1fM", count / 1_000_000.0)
     }
 }
 

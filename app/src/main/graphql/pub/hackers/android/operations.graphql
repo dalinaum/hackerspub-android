@@ -33,6 +33,7 @@ fragment PostFields on Post {
     url
     iri
     viewerHasShared
+    viewerHasBookmarked
     actor {
         ...ActorFields
     }
@@ -102,6 +103,7 @@ fragment SharedPostFields on Post {
     url
     iri
     viewerHasShared
+    viewerHasBookmarked
     actor {
         ...ActorFields
     }
@@ -260,8 +262,8 @@ query Notifications($after: String) {
     }
 }
 
-query SearchPost($query: String!) {
-    searchPost(query: $query) {
+query SearchPost($query: String!, $languages: [Locale!]) {
+    searchPost(query: $query, languages: $languages) {
         edges {
             node {
                 ...PostFields
@@ -432,6 +434,11 @@ query PostDetail($id: ID!, $repliesAfter: String) {
                 }
             }
         }
+        ... on Article {
+            contents {
+                toc
+            }
+        }
     }
 }
 
@@ -453,6 +460,24 @@ query PostReplies($id: ID!, $after: String) {
                     endCursor
                 }
             }
+        }
+    }
+}
+
+query Bookmarks($after: String, $postType: PostType) {
+    bookmarks(first: 20, after: $after, postType: $postType) {
+        edges {
+            cursor
+            node {
+                ...PostFields
+                sharedPost {
+                    ...SharedPostFields
+                }
+            }
+        }
+        pageInfo {
+            hasNextPage
+            endCursor
         }
     }
 }
@@ -514,6 +539,31 @@ mutation VerifyPasskeyRegistration($accountId: ID!, $name: String!, $registratio
     }
 }
 
+mutation BookmarkPost($postId: ID!) {
+    bookmarkPost(input: { postId: $postId }) {
+        __typename
+        ... on BookmarkPostPayload {
+            post {
+                id
+                viewerHasBookmarked
+            }
+        }
+    }
+}
+
+mutation UnbookmarkPost($postId: ID!) {
+    unbookmarkPost(input: { postId: $postId }) {
+        __typename
+        ... on UnbookmarkPostPayload {
+            post {
+                id
+                viewerHasBookmarked
+            }
+            unbookmarkedPostId
+        }
+    }
+}
+
 mutation RevokePasskey($passkeyId: ID!) {
     revokePasskey(passkeyId: $passkeyId)
 }
@@ -538,9 +588,7 @@ mutation CreateNote($content: Markdown!, $language: Locale!, $visibility: PostVi
     createNote(input: { content: $content, language: $language, visibility: $visibility, replyTargetId: $replyTargetId, quotedPostId: $quotedPostId }) {
         ... on CreateNotePayload {
             note {
-                id
-                content
-                published
+                ...PostFields
             }
         }
         ... on InvalidInputError {
@@ -893,6 +941,39 @@ mutation PublishArticleDraft($id: ID!, $slug: String!, $language: Locale!, $allo
             notAuthenticated
         }
     }
+}
+
+query EditAccount {
+    viewer {
+        id
+        name
+        bio
+        avatarUrl
+        handle
+        links {
+            name
+            url
+        }
+    }
+}
+
+mutation UpdateAccount($input: UpdateAccountInput!) {
+    updateAccount(input: $input) {
+        account {
+            id
+            name
+            bio
+            avatarUrl
+            links {
+                name
+                url
+            }
+        }
+    }
+}
+
+mutation MarkNotificationsAsRead {
+    markNotificationsAsRead
 }
 
 mutation RegisterFcmDeviceToken($input: RegisterFcmDeviceTokenInput!) {

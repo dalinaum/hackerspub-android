@@ -14,17 +14,21 @@ import pub.hackers.android.graphql.ActorByHandleQuery
 import pub.hackers.android.graphql.ActorNotesQuery
 import pub.hackers.android.graphql.ActorPostsQuery
 import pub.hackers.android.graphql.AddReactionToPostMutation
+import pub.hackers.android.graphql.BookmarkPostMutation
+import pub.hackers.android.graphql.BookmarksQuery
 import pub.hackers.android.graphql.BlockActorMutation
 import pub.hackers.android.graphql.CompleteLoginChallengeMutation
 import pub.hackers.android.graphql.CreateNoteMutation
 import pub.hackers.android.graphql.DeleteArticleDraftMutation
 import pub.hackers.android.graphql.DeletePostMutation
+import pub.hackers.android.graphql.EditAccountQuery
 import pub.hackers.android.graphql.GetPasskeyAuthenticationOptionsMutation
 import pub.hackers.android.graphql.GetPasskeyRegistrationOptionsMutation
 import pub.hackers.android.graphql.FollowActorMutation
 import pub.hackers.android.graphql.LocalTimelineQuery
 import pub.hackers.android.graphql.LoginByPasskeyMutation
 import pub.hackers.android.graphql.LoginByUsernameMutation
+import pub.hackers.android.graphql.MarkNotificationsAsReadMutation
 import pub.hackers.android.graphql.NotificationsQuery
 import pub.hackers.android.graphql.PersonalTimelineQuery
 import pub.hackers.android.graphql.PostQuotesQuery
@@ -48,8 +52,12 @@ import pub.hackers.android.graphql.SearchPostQuery
 import pub.hackers.android.graphql.SharePostMutation
 import pub.hackers.android.graphql.UnblockActorMutation
 import pub.hackers.android.graphql.UnfollowActorMutation
+import pub.hackers.android.graphql.UnbookmarkPostMutation
 import pub.hackers.android.graphql.UnsharePostMutation
+import pub.hackers.android.graphql.UpdateAccountMutation
 import pub.hackers.android.graphql.ViewerQuery
+import pub.hackers.android.graphql.type.AccountLinkInput
+import pub.hackers.android.graphql.type.UpdateAccountInput
 import pub.hackers.android.graphql.fragment.ActorFields
 import pub.hackers.android.graphql.fragment.EngagementStatsFields
 import pub.hackers.android.graphql.fragment.MediaFields
@@ -178,9 +186,60 @@ class HackersPubRepository @Inject constructor(
         }
     }
 
-    suspend fun searchPosts(query: String): Result<List<Post>> {
+    suspend fun markNotificationsAsRead(): Result<Unit> {
         return try {
-            val response = apolloClient.query(SearchPostQuery(query)).execute()
+            val response = apolloClient.mutation(MarkNotificationsAsReadMutation()).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                Result.success(Unit)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun bookmarkPost(postId: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(BookmarkPostMutation(postId)).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else if (response.data?.bookmarkPost?.onBookmarkPostPayload != null) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Failed to bookmark"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun unbookmarkPost(postId: String): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(UnbookmarkPostMutation(postId)).execute()
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else if (response.data?.unbookmarkPost?.onUnbookmarkPostPayload != null) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Failed to remove bookmark"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun searchPosts(
+        query: String,
+        languages: List<String>
+    ): Result<List<Post>> {
+        return try {
+            val response = apolloClient.query(
+                SearchPostQuery(
+                    query = query,
+                    languages = Optional.present(languages)
+                )
+            ).execute()
 
             if (response.hasErrors()) {
                 Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
@@ -189,6 +248,39 @@ class HackersPubRepository @Inject constructor(
                     edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
                 } ?: emptyList()
                 Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getBookmarks(
+        after: String? = null,
+        postType: pub.hackers.android.graphql.type.PostType? = null,
+    ): Result<TimelineResult> {
+        return try {
+            val response = apolloClient.query(
+                BookmarksQuery(
+                    after = Optional.presentIfNotNull(after),
+                    postType = Optional.presentIfNotNull(postType)
+                )
+            ).fetchPolicy(FetchPolicy.NetworkOnly).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val data = response.data?.bookmarks
+                withContext(Dispatchers.Default) {
+                    Result.success(
+                        TimelineResult(
+                            posts = data?.edges?.map { edge ->
+                                edge.node.postFields.toPost(edge.node.sharedPost?.sharedPostFields?.toPost())
+                            } ?: emptyList(),
+                            hasNextPage = data?.pageInfo?.hasNextPage ?: false,
+                            endCursor = data?.pageInfo?.endCursor
+                        )
+                    )
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -213,6 +305,12 @@ class HackersPubRepository @Inject constructor(
                         replyTarget = node.replyTarget?.postFields?.toPost(),
                         visibility = node.visibility.toPostVisibility()
                     )
+
+                    val toc = response.data?.node?.onArticle?.contents
+                        ?.firstOrNull()
+                        ?.toc
+                        ?.let { parseTocJson(it) }
+                        ?: emptyList()
 
                     val reactionGroups = node.reactionGroups.mapNotNull { group ->
                         when {
@@ -252,7 +350,8 @@ class HackersPubRepository @Inject constructor(
                             reactionGroups = reactionGroups,
                             replies = replies,
                             hasMoreReplies = node.replies.pageInfo.hasNextPage,
-                            repliesEndCursor = node.replies.pageInfo.endCursor
+                            repliesEndCursor = node.replies.pageInfo.endCursor,
+                            toc = toc,
                         )
                     )
                 }
@@ -488,6 +587,69 @@ class HackersPubRepository @Inject constructor(
                         )
                     }
                 )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getEditableAccount(): Result<EditableAccount> {
+        return try {
+            val response = apolloClient.query(EditAccountQuery())
+                .fetchPolicy(FetchPolicy.NetworkOnly)
+                .execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else {
+                val viewer = response.data?.viewer
+                    ?: return Result.failure(Exception("Not signed in"))
+                Result.success(
+                    EditableAccount(
+                        id = viewer.id,
+                        name = viewer.name,
+                        bio = viewer.bio.toString(),
+                        avatarUrl = viewer.avatarUrl.toString(),
+                        handle = viewer.handle,
+                        links = viewer.links.map { link ->
+                            EditableAccountLink(name = link.name, url = link.url.toString())
+                        }
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateAccount(
+        id: String,
+        name: String,
+        bio: String,
+        avatarUrl: String?,
+        links: List<EditableAccountLink>,
+    ): Result<Unit> {
+        return try {
+            val response = apolloClient.mutation(
+                UpdateAccountMutation(
+                    input = UpdateAccountInput(
+                        id = id,
+                        name = Optional.present(name),
+                        bio = Optional.present(bio),
+                        avatarUrl = if (avatarUrl != null) Optional.present(avatarUrl) else Optional.Absent,
+                        links = Optional.present(
+                            links.map { AccountLinkInput(name = it.name, url = it.url) }
+                        ),
+                    )
+                )
+            ).execute()
+
+            if (response.hasErrors()) {
+                Result.failure(Exception(response.errors?.firstOrNull()?.message ?: "Unknown error"))
+            } else if (response.data?.updateAccount?.account == null) {
+                Result.failure(Exception("Update failed"))
+            } else {
+                Result.success(Unit)
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -746,24 +908,7 @@ class HackersPubRepository @Inject constructor(
                 val result = response.data?.createNote
                 when {
                     result?.onCreateNotePayload != null -> {
-                        val note = result.onCreateNotePayload.note
-                        Result.success(
-                            Post(
-                                id = note.id,
-                                typename = "Note",
-                                name = null,
-                                published = Instant.parse(note.published.toString()),
-                                summary = null,
-                                content = note.content.toString(),
-                                excerpt = "",
-                                url = null,
-                                viewerHasShared = false,
-                                actor = Actor("", null, "", ""),
-                                media = emptyList(),
-                                engagementStats = EngagementStats(0, 0, 0, 0),
-                                mentions = emptyList()
-                            )
-                        )
+                        Result.success(result.onCreateNotePayload.note.postFields.toPost())
                     }
                     result?.onInvalidInputError != null -> {
                         Result.failure(Exception("Invalid input: ${result.onInvalidInputError.inputPath}"))
@@ -1320,6 +1465,7 @@ class HackersPubRepository @Inject constructor(
             url = url?.toString(),
             iri = iri.toString(),
             viewerHasShared = viewerHasShared,
+            viewerHasBookmarked = viewerHasBookmarked,
             actor = actor.actorFields.toActor(),
             media = media.map { it.mediaFields.toMedia() },
             link = link?.let { l ->
@@ -1386,6 +1532,7 @@ class HackersPubRepository @Inject constructor(
             url = url?.toString(),
             iri = iri.toString(),
             viewerHasShared = viewerHasShared,
+            viewerHasBookmarked = viewerHasBookmarked,
             actor = actor.actorFields.toActor(),
             media = media.map { it.mediaFields.toMedia() },
             engagementStats = engagementStats.engagementStatsFields.toEngagementStats(),
@@ -1523,4 +1670,5 @@ class HackersPubRepository @Inject constructor(
             else -> value
         }
     }
+
 }

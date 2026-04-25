@@ -1,8 +1,10 @@
 package pub.hackers.android.ui.screens.search
 
+import android.os.LocaleList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,10 +16,14 @@ import pub.hackers.android.domain.model.Actor
 import pub.hackers.android.domain.model.Post
 import javax.inject.Inject
 
+enum class SearchMode { ALL, PEOPLE, POSTS, TAGS }
+
 data class SearchUiState(
     val query: String = "",
+    val mode: SearchMode = SearchMode.ALL,
     val actors: List<Actor> = emptyList(),
     val posts: List<Post> = emptyList(),
+    val taggedPosts: List<Post> = emptyList(),
     val isLoading: Boolean = false,
     val hasSearched: Boolean = false,
     val error: String? = null,
@@ -46,56 +52,63 @@ class SearchViewModel @Inject constructor(
         _uiState.update { it.copy(query = query) }
     }
 
+    fun setMode(mode: SearchMode) {
+        _uiState.update { it.copy(mode = mode) }
+    }
+
     fun search() {
-        val query = _uiState.value.query.trim()
-        if (query.isEmpty()) return
+        val rawQuery = _uiState.value.query.trim()
+        if (rawQuery.isEmpty()) return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true, resolvedObjectUrl = null, actors = emptyList()) }
-
-            // Save to recent searches
-            preferencesManager.addRecentSearch(query)
-
-            // Try searchObject first for URL/handle resolution
-            repository.searchObject(query)
-                .onSuccess { url ->
-                    if (url != null) {
-                        _uiState.update { it.copy(resolvedObjectUrl = url) }
-                    }
-                }
-
-            // Search actors if query looks like a handle
-            if (query.startsWith("@") || query.contains("@")) {
-                val handleQuery = query.removePrefix("@")
-                repository.searchActorsByHandle(handleQuery, limit = 5)
-                    .onSuccess { actors ->
-                        _uiState.update { it.copy(actors = actors) }
-                    }
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    error = null,
+                    hasSearched = true,
+                    resolvedObjectUrl = null,
+                    actors = emptyList(),
+                    posts = emptyList(),
+                    taggedPosts = emptyList()
+                )
             }
 
-            // Always search posts too
-            repository.searchPosts(query)
-                .onSuccess { posts ->
-                    // Deduplicate: remove actors whose IDs appear in post authors
-                    val postActorIds = posts.map { it.actor.id }.toSet()
-                    val dedupedActors = _uiState.value.actors.filter { it.id !in postActorIds }
+            preferencesManager.addRecentSearch(rawQuery)
 
-                    _uiState.update {
-                        it.copy(
-                            posts = posts,
-                            actors = dedupedActors,
-                            isLoading = false
-                        )
-                    }
-                }
-                .onFailure { error ->
-                    _uiState.update {
-                        it.copy(
-                            error = error.message,
-                            isLoading = false
-                        )
-                    }
-                }
+            val handleQuery = rawQuery.removePrefix("@")
+            val tagQuery = if (rawQuery.startsWith("#")) rawQuery else "#$rawQuery"
+            val languages = systemLanguageTags()
+
+            val objectDeferred = async { repository.searchObject(rawQuery) }
+            val actorsDeferred = async { repository.searchActorsByHandle(handleQuery, limit = 30) }
+            val postsDeferred = async { repository.searchPosts(rawQuery, languages) }
+            val tagsDeferred = async { repository.searchPosts(tagQuery, languages) }
+
+            val objectResult = objectDeferred.await()
+            val actorsResult = actorsDeferred.await()
+            val postsResult = postsDeferred.await()
+            val tagsResult = tagsDeferred.await()
+
+            val resolvedUrl = objectResult.getOrNull()
+            val actors = actorsResult.getOrDefault(emptyList())
+            val posts = postsResult.getOrDefault(emptyList())
+            val taggedPosts = tagsResult.getOrDefault(emptyList())
+
+            val anySuccess =
+                actorsResult.isSuccess || postsResult.isSuccess || tagsResult.isSuccess
+            val firstError = listOf(actorsResult, postsResult, tagsResult)
+                .firstNotNullOfOrNull { it.exceptionOrNull() }
+
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    resolvedObjectUrl = resolvedUrl,
+                    actors = actors,
+                    posts = posts,
+                    taggedPosts = taggedPosts,
+                    error = if (!anySuccess) firstError?.message else null
+                )
+            }
         }
     }
 
@@ -105,7 +118,7 @@ class SearchViewModel @Inject constructor(
 
     fun clearSearch() {
         _uiState.update {
-            SearchUiState(recentSearches = it.recentSearches)
+            SearchUiState(recentSearches = it.recentSearches, mode = it.mode)
         }
     }
 
@@ -124,5 +137,14 @@ class SearchViewModel @Inject constructor(
     fun selectRecentSearch(query: String) {
         _uiState.update { it.copy(query = query) }
         search()
+    }
+
+    private fun systemLanguageTags(): List<String> {
+        val locales = LocaleList.getDefault()
+        val tags = (0 until locales.size())
+            .map { locales[it].language }
+            .filter { it.isNotBlank() }
+            .distinct()
+        return tags.ifEmpty { listOf("en") }
     }
 }

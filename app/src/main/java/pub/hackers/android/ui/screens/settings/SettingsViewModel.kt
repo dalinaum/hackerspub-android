@@ -1,6 +1,4 @@
 package pub.hackers.android.ui.screens.settings
-
-import android.app.Activity
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
@@ -29,6 +27,8 @@ import pub.hackers.android.data.local.SessionManager
 import pub.hackers.android.data.messaging.FcmTokenManager
 import pub.hackers.android.data.repository.HackersPubRepository
 import pub.hackers.android.domain.model.Passkey
+import pub.hackers.android.ui.theme.ThemeMode
+import java.util.Locale
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -44,6 +44,7 @@ data class SettingsUiState(
     val timelineMaxLength: Int = 0,
     val useInAppBrowser: Boolean = true,
     val fontSizePercent: Int = 100,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val passkeys: List<Passkey> = emptyList(),
     val accountId: String? = null,
     val isLoadingPasskeys: Boolean = false,
@@ -110,6 +111,7 @@ class SettingsViewModel @Inject constructor(
             val maxLength = preferencesManager.timelineMaxLength.first()
             val inAppBrowser = preferencesManager.useInAppBrowser.first()
             val fontSize = preferencesManager.fontSizePercent.first()
+            val theme = preferencesManager.themeMode.first()
 
             _uiState.update {
                 it.copy(
@@ -117,7 +119,8 @@ class SettingsViewModel @Inject constructor(
                     confirmBeforeShare = confirmShare,
                     timelineMaxLength = maxLength,
                     useInAppBrowser = inAppBrowser,
-                    fontSizePercent = fontSize
+                    fontSizePercent = fontSize,
+                    themeMode = theme
                 )
             }
         }
@@ -146,6 +149,11 @@ class SettingsViewModel @Inject constructor(
     fun setFontSizePercent(value: Int) {
         _uiState.update { it.copy(fontSizePercent = value) }
         viewModelScope.launch { preferencesManager.setFontSizePercent(value) }
+    }
+
+    fun setThemeMode(value: ThemeMode) {
+        _uiState.update { it.copy(themeMode = value) }
+        viewModelScope.launch { preferencesManager.setThemeMode(value) }
     }
 
     fun signOut() {
@@ -188,9 +196,9 @@ class SettingsViewModel @Inject constructor(
     private fun formatBytes(bytes: Long): String {
         return when {
             bytes < 1024 -> "$bytes B"
-            bytes < 1024 * 1024 -> String.format("%.1f KB", bytes / 1024.0)
-            bytes < 1024 * 1024 * 1024 -> String.format("%.1f MB", bytes / (1024.0 * 1024))
-            else -> String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024))
+            bytes < 1024 * 1024 -> String.format(Locale.ROOT, "%.1f KB", bytes / 1024.0)
+            bytes < 1024 * 1024 * 1024 -> String.format(Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024))
+            else -> String.format(Locale.ROOT, "%.1f GB", bytes / (1024.0 * 1024 * 1024))
         }
     }
 
@@ -234,7 +242,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     @RequiresApi(Build.VERSION_CODES.P)
-    fun registerPasskey(name: String, activity: Activity) {
+    fun registerPasskey(name: String, context: Context) {
         val accountId = _uiState.value.accountId ?: run {
             android.util.Log.e("PasskeyAuth", "registerPasskey: accountId is null")
             return
@@ -247,7 +255,7 @@ class SettingsViewModel @Inject constructor(
                     .getOrThrow()
                 android.util.Log.d("PasskeyAuth", "registerPasskey: got options")
 
-                val registrationResponse = passkeyManager.register(optionsJson, activity)
+                val registrationResponse = passkeyManager.register(optionsJson, context)
                 android.util.Log.d("PasskeyAuth", "registerPasskey: got registration response: ${registrationResponse.take(200)}")
 
                 // Parse and re-serialize to ensure clean JSON, then convert to Map for Apollo

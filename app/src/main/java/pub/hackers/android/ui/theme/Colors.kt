@@ -16,7 +16,9 @@ data class AppColorScheme(
     val divider: Color,
     val buttonOutline: Color,
     val composeAccent: Color,
+    val composeOnAccent: Color,
     val reaction: Color,
+    val bookmark: Color,
     val share: Color,
     val hashtag: Color,
 )
@@ -32,7 +34,9 @@ val LightAppColors = AppColorScheme(
     divider = Color(0xFFF2F2F7),
     buttonOutline = Color(0xFFD6D3D1),
     composeAccent = Color(0xFFEF4444),
+    composeOnAccent = Color(0xFFFFFFFF),
     reaction = Color(0xFFE8453C),
+    bookmark = Color(0xFFF59E0B),
     share = Color(0xFF34D399),
     hashtag = Color(0xFF0891B2),
 )
@@ -48,7 +52,9 @@ val DarkAppColors = AppColorScheme(
     divider = Color(0xFF262626),
     buttonOutline = Color(0xFF525252),
     composeAccent = Color(0xFFF87171),
+    composeOnAccent = Color(0xFFFFFFFF),
     reaction = Color(0xFFE8453C),
+    bookmark = Color(0xFFFBBF24),
     share = Color(0xFF34D399),
     hashtag = Color(0xFF22D3EE),
 )

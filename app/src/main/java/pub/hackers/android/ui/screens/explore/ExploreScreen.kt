@@ -1,6 +1,7 @@
 package pub.hackers.android.ui.screens.explore
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -60,6 +61,8 @@ fun ExploreScreen(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val context = LocalContext.current
+    val bookmarkedMessage = stringResource(R.string.bookmarked)
+    val bookmarkRemovedMessage = stringResource(R.string.bookmark_removed)
     val colors = LocalAppColors.current
     val typography = LocalAppTypography.current
 
@@ -213,6 +216,21 @@ fun ExploreScreen(
                                                 viewModel.showReactionPicker(
                                                     post.sharedPost?.id ?: post.id
                                                 )
+                                            }
+                                        } else null,
+                                        onBookmarkClick = if (isLoggedIn) {
+                                            {
+                                                val displayPost = post.sharedPost ?: post
+                                                Toast.makeText(
+                                                    context,
+                                                    if (displayPost.viewerHasBookmarked) {
+                                                        bookmarkRemovedMessage
+                                                    } else {
+                                                        bookmarkedMessage
+                                                    },
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                                viewModel.toggleBookmark(post)
                                             }
                                         } else null,
                                         onExternalShareClick = {

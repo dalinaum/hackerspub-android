@@ -37,6 +37,7 @@ import pub.hackers.android.ui.components.BottomNavItem
 import pub.hackers.android.ui.components.LocalFontScale
 import pub.hackers.android.ui.components.ProvideInAppBrowserUriHandler
 import pub.hackers.android.ui.screens.auth.SignInScreen
+import pub.hackers.android.ui.screens.bookmarks.BookmarksScreen
 import pub.hackers.android.ui.screens.compose.ComposeArticleScreen
 import pub.hackers.android.ui.screens.compose.ComposeScreen
 import pub.hackers.android.ui.screens.drafts.DraftsScreen
@@ -44,12 +45,16 @@ import pub.hackers.android.ui.screens.explore.ExploreScreen
 import pub.hackers.android.ui.screens.notifications.NotificationsScreen
 import pub.hackers.android.ui.screens.postdetail.PostByUrlResolverScreen
 import pub.hackers.android.ui.screens.postdetail.PostDetailScreen
+import pub.hackers.android.ui.screens.editprofile.EditProfileScreen
 import pub.hackers.android.ui.screens.profile.ProfileScreen
 import pub.hackers.android.ui.screens.recommendedactors.RecommendedActorsScreen
 import pub.hackers.android.ui.screens.search.SearchScreen
+import pub.hackers.android.ui.screens.licenses.LicensesScreen
 import pub.hackers.android.ui.screens.settings.SettingsScreen
 import pub.hackers.android.ui.screens.timeline.TimelineScreen
 import pub.hackers.android.ui.screens.webview.WebViewScreen
+
+private const val PROFILE_REFRESH_KEY = "profile_refresh"
 
 sealed class Screen(
     val route: String,
@@ -136,12 +141,15 @@ sealed class DetailScreen(val route: String) {
         }
     }
     data object Drafts : DetailScreen("drafts")
+    data object Bookmarks : DetailScreen("bookmarks")
+    data object EditProfile : DetailScreen("edit-profile")
     data object WebView : DetailScreen("webview?url={url}") {
         fun createRoute(url: String): String {
             val encoded = android.net.Uri.encode(url)
             return "webview?url=$encoded"
         }
     }
+    data object Licenses : DetailScreen("licenses")
 }
 
 @Composable
@@ -408,8 +416,21 @@ fun HackersPubApp(
                     onProfileClick = { handle ->
                         navController.navigate(DetailScreen.Profile.createRoute(handle))
                     },
+                    onNavigateBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(Screen.Timeline.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    },
                     onDraftsClick = {
                         navController.navigate(DetailScreen.Drafts.route)
+                    },
+                    onBookmarksClick = {
+                        navController.navigate(DetailScreen.Bookmarks.route)
+                    },
+                    onLicensesClick = {
+                        navController.navigate(DetailScreen.Licenses.route)
                     },
                     isLoggedIn = isLoggedIn
                 )
@@ -527,8 +548,15 @@ fun HackersPubApp(
                 arguments = listOf(navArgument("handle") { type = NavType.StringType })
             ) { backStackEntry ->
                 val handle = backStackEntry.arguments?.getString("handle") ?: return@composable
+                val profileRefreshFlag = backStackEntry.savedStateHandle
+                    .getStateFlow(PROFILE_REFRESH_KEY, false)
+                    .collectAsState()
                 ProfileScreen(
                     handle = handle,
+                    refreshSignal = profileRefreshFlag.value,
+                    onRefreshConsumed = {
+                        backStackEntry.savedStateHandle[PROFILE_REFRESH_KEY] = false
+                    },
                     onNavigateBack = {
                         navController.popBackStack()
                     },
@@ -543,6 +571,23 @@ fun HackersPubApp(
                     },
                     onQuoteClick = { postId ->
                         navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
+                    },
+                    onEditProfileClick = {
+                        navController.navigate(DetailScreen.EditProfile.route)
+                    }
+                )
+            }
+
+            composable(DetailScreen.EditProfile.route) {
+                EditProfileScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
+                    onSaved = {
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set(PROFILE_REFRESH_KEY, true)
+                        navController.popBackStack()
                     }
                 )
             }
@@ -584,6 +629,26 @@ fun HackersPubApp(
                 )
             }
 
+            composable(DetailScreen.Bookmarks.route) {
+                BookmarksScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
+                    onPostClick = { postId ->
+                        navController.navigate(DetailScreen.PostDetail.createRoute(postId))
+                    },
+                    onProfileClick = { handle ->
+                        navController.navigate(DetailScreen.Profile.createRoute(handle))
+                    },
+                    onReplyClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(replyTo = postId))
+                    },
+                    onQuoteClick = { postId ->
+                        navController.navigate(DetailScreen.Compose.createRoute(quoteOf = postId))
+                    },
+                )
+            }
+
             composable(DetailScreen.RecommendedActors.route) {
                 RecommendedActorsScreen(
                     onNavigateBack = {
@@ -604,6 +669,14 @@ fun HackersPubApp(
                 val url = backStackEntry.arguments?.getString("url") ?: return@composable
                 WebViewScreen(
                     url = url,
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            composable(DetailScreen.Licenses.route) {
+                LicensesScreen(
                     onNavigateBack = {
                         navController.popBackStack()
                     }
