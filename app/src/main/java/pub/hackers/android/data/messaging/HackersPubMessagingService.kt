@@ -83,8 +83,8 @@ class HackersPubMessagingService : FirebaseMessagingService() {
         )
 
         val notification = NotificationCompat.Builder(this, HackersPubApplication.NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Hackers' Pub")
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
